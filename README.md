@@ -30,7 +30,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-key-here
 
 Scripts that call the API exit with a message if the key is missing, and never print it.
 
-Models are constants in `common.py` and can be overridden in `.env`:
+Models are constants in `src/invoice_batch/config.py` and can be overridden in `.env`:
 
 | Variable | Default | Used for |
 | --- | --- | --- |
@@ -39,17 +39,27 @@ Models are constants in `common.py` and can be overridden in `.env`:
 
 ## Run
 
+Each stage is a command registered in `pyproject.toml` under `[project.scripts]`:
+
 | Stage | Command | Calls the API? |
 | --- | --- | --- |
-| 1 | `uv run generate_invoices.py` | No. Writes `data/invoices/*.pdf` and `data/ground_truth.json` |
-| 2 | `uv run schema.py` | No. Prints the tool definition |
-| 3 | `uv run dry_run.py` | Yes, 4 synchronous requests (well under $0.01) |
+| 1 | `uv run generate-invoices` | No. Writes `data/invoices/*.pdf` and `data/ground_truth.json` |
+| 2 | `uv run show-schema` | No. Prints the tool definition |
+| 3 | `uv run dry-run` | Yes, 4 synchronous requests (well under $0.01) |
+
+## Test
+
+```bash
+uv run pytest
+```
+
+The tests never call the API. They cover the tool schema (strict-mode rules), the request builder, pricing, the API key check, and the generated test set (counts, totals, reproducibility). New behavior is added test-first: write a failing test, then the code that makes it pass.
 
 ## How it works
 
 ### The test documents
 
-`generate_invoices.py` uses a fixed random seed, so it produces the same 23 files every time. `data/` is git-ignored; re-run the script to recreate it.
+`generate-invoices` uses a fixed random seed and reportlab's invariant mode, so it produces byte-identical files every time. `data/` is git-ignored; re-run the command to recreate it.
 
 | custom_id | Group | Expected outcome |
 | --- | --- | --- |
@@ -66,7 +76,7 @@ Models are constants in `common.py` and can be overridden in `.env`:
 
 Claude receives each PDF page as an image **and** as its extracted text. Small grey print is therefore still easy to read through the text layer. That is why `17_cluttered` puts its decoy digits into the text layer as well, not just into the picture.
 
-### Progam flow
+### Program flow
 
 ```mermaid
 sequenceDiagram
@@ -101,23 +111,43 @@ The docs (Tool use → Forcing tool use) say Claude Sonnet 5.5, Opus 5.5, and th
 | `claude-haiku-5-5` | `{"type":"tool","name":"extract_invoice"}` | The API forces the call; `strict` forces the shape |
 | `claude-sonnet-5-5` | `{"type":"auto"}` | The prompt asks for the tool; `strict` forces the shape *if* it calls it |
 
-`common.tool_choice_for()` picks the right one per model. If an `auto` reply has no `tool_use` block, triage counts it as a failed check.
+`request_builder.tool_choice_for()` picks the right one per model. It is a lookup rather than a hard-coded choice because `MODEL` and `ESCALATION_MODEL` can be overridden. If an `auto` reply has no `tool_use` block, triage counts it as a failed check.
 
 ## Code organization
 
-- `generate_invoices.py`: the three layouts (`layout_classic`, `layout_modern`, `layout_compact`), the special cases, and the ground truth file.
-- `schema.py`: `EXTRACT_INVOICE_TOOL` (sent to the API) and the matching Pydantic `InvoiceExtraction` (used to validate what comes back).
-- `common.py`: model constants, the key check, `build_params()` (the full request for one PDF), the system prompt, prices, and `cost_usd()`.
-- `dry_run.py`: sends 4 documents synchronously and prints the raw `tool_use` block, `stop_reason`, usage, and any error.
+The code is a package in `src/invoice_batch/`. Library modules hold the logic and are covered by tests; `cli/` holds thin commands that call them and print results.
+
+```
+src/invoice_batch/
+├── config.py            paths, MODEL / ESCALATION_MODEL, API key check, client
+├── schema.py            EXTRACT_INVOICE_TOOL + Pydantic InvoiceExtraction
+├── request_builder.py   system prompt, tool_choice_for(), build_params()
+├── pricing.py           PRICES, cost_usd() (standard vs. batch)
+├── synthetic/           the fake test set
+│   ├── data.py          vendors, customers, make_invoice(), truth_of()
+│   ├── layouts.py       classic, modern, compact, cluttered, letter pages
+│   └── build.py         generate(): all 23 documents + ground_truth.json
+└── cli/                 one module per command
+    ├── generate_invoices.py
+    ├── show_schema.py
+    └── dry_run.py
+tests/                   pytest, one file per library module
+```
+
+- `schema.py`: `EXTRACT_INVOICE_TOOL` is sent to the API; `InvoiceExtraction` validates what comes back.
+- `request_builder.py`: `build_params()` returns the full request for one PDF. The dry run and the batch stages use the same function.
+- `synthetic/build.py`: `generate(out_dir, seed=42)` writes the PDFs and ground truth. It takes the output folder as an argument, so tests can write to a temporary folder.
+- `cli/dry_run.py`: sends 4 documents synchronously and prints the raw `tool_use` block, `stop_reason`, usage, and any error.
 
 ## Project files
 
 | File | Purpose |
 | --- | --- |
-| `generate_invoices.py` | Creates the 23 test PDFs and `ground_truth.json` |
-| `schema.py` | The `extract_invoice` tool definition |
-| `common.py` | Shared settings, request builder, pricing |
-| `dry_run.py` | Synchronous extraction of 4 documents |
+| `src/invoice_batch/` | The package (see above) |
+| `tests/` | pytest suite; runs offline |
+| `pyproject.toml` | Dependencies, the stage commands, pytest settings |
 | `.env.example` | Environment configuration template |
+| `data/` | Generated test set (git-ignored) |
+| `runs/` | Batch run outputs, added in later stages (git-ignored) |
 
 After editing dependencies in `pyproject.toml`, run `uv sync`. You can also use `uv add package-name` or `uv remove package-name`.
