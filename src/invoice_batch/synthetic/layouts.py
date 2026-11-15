@@ -6,7 +6,7 @@ Each function draws one page onto a reportlab canvas.
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 
-from invoice_batch.synthetic.data import money, rng
+from invoice_batch.synthetic.data import money
 
 PAGE_W, PAGE_H = letter
 
@@ -171,7 +171,7 @@ def layout_compact(c, inv, *, show_due=True, total_override=None):
     c.drawCentredString(PAGE_W / 2, y, "*** THANK YOU ***")
 
 
-def layout_cluttered(c, inv):
+def layout_cluttered(c, inv, rng):
     """Busy layout: a security pattern of decoy digits sits behind (and in the
     text layer alongside) small, tightly packed numbers."""
     cur = inv["currency"]

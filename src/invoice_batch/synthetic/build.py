@@ -12,12 +12,13 @@ Documents (custom_id = filename stem):
 """
 
 import json
+import random
 from pathlib import Path
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-from invoice_batch.synthetic.data import items_total, make_invoice, rng, truth_of
+from invoice_batch.synthetic.data import items_total, make_invoice, truth_of
 from invoice_batch.synthetic.layouts import (
     draw_letter, layout_classic, layout_cluttered, layout_compact, layout_modern,
 )
@@ -34,8 +35,12 @@ def _save_pdf(invoices_dir: Path, name: str, draw) -> None:
     c.save()
 
 
-def generate(out_dir: Path) -> list[dict]:
-    """Write out_dir/invoices/*.pdf and out_dir/ground_truth.json; return the docs."""
+def generate(out_dir: Path, seed: int = 42) -> list[dict]:
+    """Write out_dir/invoices/*.pdf and out_dir/ground_truth.json; return the docs.
+
+    The same seed always produces the same documents.
+    """
+    rng = random.Random(seed)
     invoices_dir = out_dir / "invoices"
     invoices_dir.mkdir(parents=True, exist_ok=True)
     for old in invoices_dir.glob("*.pdf"):
@@ -53,7 +58,7 @@ def generate(out_dir: Path) -> list[dict]:
     for i in range(1, 17):
         lay = names[(i - 1) % 3]
         no_due = i == 6
-        inv = make_invoice(i, with_due=not no_due)
+        inv = make_invoice(rng, i, with_due=not no_due)
         name = f"{i:02d}_clean_{lay}" + ("_no_due" if no_due else "")
         save(name, lambda c, inv=inv, lay=lay: LAYOUTS[lay](c, inv))
         add(name, "clean", lay, "VALID",
@@ -61,7 +66,7 @@ def generate(out_dir: Path) -> list[dict]:
             else "Clean invoice.", truth_of(inv))
 
     # 17 cluttered
-    inv = make_invoice(17, currency="EUR")
+    inv = make_invoice(rng, 17, currency="EUR")
     inv["line_items"] = [
         {"description": "Server rack rails (pair)", "quantity": 8, "unit_price": 186.38},
         {"description": "Patch cables Cat6 (box)", "quantity": 36, "unit_price": 18.68},
@@ -69,13 +74,13 @@ def generate(out_dir: Path) -> list[dict]:
         {"description": "Rack install labour (h)", "quantity": 13, "unit_price": 88.50},
     ]
     inv["total"] = items_total(inv["line_items"])
-    save("17_cluttered", lambda c: layout_cluttered(c, inv))
+    save("17_cluttered", lambda c: layout_cluttered(c, inv, rng))
     add("17_cluttered", "hard", "cluttered", "RETRY_ESCALATE",
         "Small digits on a background of decoy digits (also in the PDF text layer); "
         "expected to fail checks, survive a hint, and need the bigger model.", truth_of(inv))
 
     # 18 due date only in a tiny footer
-    inv18 = make_invoice(18)
+    inv18 = make_invoice(rng, 18)
     note = (f"Payment terms: amount payable in full by {inv18['due_date']:%d %B %Y}. "
             "Late payments incur 1.5% monthly interest.")
     save("18_footer_due_date", lambda c: layout_classic(c, inv18, show_due=False, footer_note=note))
@@ -85,7 +90,7 @@ def generate(out_dir: Path) -> list[dict]:
         "reveals the miss.", truth_of(inv18))
 
     # 19 unusual date + currency format
-    inv19 = make_invoice(19, currency="CHF")
+    inv19 = make_invoice(rng, 19, currency="CHF")
     inv19["vendor"], inv19["vendor_address"] = "Alpenrand Feinmechanik", ["Seestrasse 41", "8002 Zürich"]
     fmt = lambda d: f"{d.day}.{ROMAN[d.month - 1]}.{d.year}"  # noqa: E731
     swiss = lambda x: f"Fr. {x:,.2f}".replace(",", "'")  # noqa: E731
@@ -95,7 +100,7 @@ def generate(out_dir: Path) -> list[dict]:
         "returned as CHF).", truth_of(inv19))
 
     # 20 printed total does not match the line items
-    inv20 = make_invoice(20)
+    inv20 = make_invoice(rng, 20)
     printed = round(inv20["total"] + 100.00, 2)
     save("20_total_mismatch", lambda c: layout_compact(c, inv20, total_override=printed))
     t = truth_of(inv20)

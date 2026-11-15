@@ -3,8 +3,6 @@
 import random
 from datetime import date, timedelta
 
-rng = random.Random(42)
-
 VENDORS = [
     ("Bluefin Office Supply", ["118 Market Row", "Portland, OR 97204"]),
     ("Cedar & Pine Woodworks", ["44 Mill Lane", "Asheville, NC 28801"]),
@@ -33,7 +31,7 @@ PRODUCTS = [
 CURRENCY_SYMBOL = {"USD": "$", "EUR": "€", "GBP": "£", "CHF": "Fr."}
 
 
-def make_line_items(n: int) -> list[dict]:
+def make_line_items(rng: random.Random, n: int) -> list[dict]:
     items = []
     for desc in rng.sample(PRODUCTS, n):
         items.append({
@@ -48,11 +46,11 @@ def items_total(items: list[dict]) -> float:
     return round(sum(i["quantity"] * i["unit_price"] for i in items), 2)
 
 
-def make_invoice(n: int, currency: str | None = None, with_due: bool = True) -> dict:
+def make_invoice(rng: random.Random, n: int, currency: str | None = None, with_due: bool = True) -> dict:
     vendor, address = VENDORS[n % len(VENDORS)]
     cust_name, cust_email = CUSTOMERS[n % len(CUSTOMERS)]
     issue = date(2026, 1, 5) + timedelta(days=rng.randint(0, 240))
-    items = make_line_items(rng.randint(2, 5))
+    items = make_line_items(rng, rng.randint(2, 5))
     return {
         "invoice_no": f"INV-2026-{rng.randint(1000, 9999)}",
         "vendor": vendor,

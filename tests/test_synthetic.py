@@ -65,3 +65,10 @@ def test_corrupt_file_is_not_a_pdf(out_dir):
 
 def test_real_pdfs_start_with_the_pdf_header(out_dir):
     assert (out_dir / "invoices" / "01_clean_classic.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_generating_twice_gives_identical_ground_truth(tmp_path):
+    generate(tmp_path / "a")
+    generate(tmp_path / "b")
+    assert (tmp_path / "a" / "ground_truth.json").read_text() == \
+        (tmp_path / "b" / "ground_truth.json").read_text()

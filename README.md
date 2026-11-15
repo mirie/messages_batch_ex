@@ -28,7 +28,7 @@ Edit `.env` and replace the placeholder with your key:
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
 ```
 
-`.env` is excluded from Git. Scripts that call the API exit with a message if the key is missing, and never print it.
+Scripts that call the API exit with a message if the key is missing, and never print it.
 
 Models are constants in `common.py` and can be overridden in `.env`:
 
@@ -66,11 +66,11 @@ Models are constants in `common.py` and can be overridden in `.env`:
 
 Claude receives each PDF page as an image **and** as its extracted text. Small grey print is therefore still easy to read through the text layer. That is why `17_cluttered` puts its decoy digits into the text layer as well, not just into the picture.
 
-### The tool is the answer
+### Progam flow
 
 ```mermaid
 sequenceDiagram
-    participant Code as Your code
+    participant Code as Data extraction code
     participant API as Messages API
     Code->>API: PDF + extract_invoice tool + tool_choice {"type":"tool"}
     API-->>Code: stop_reason "tool_use", content = [tool_use {input: {...fields}}]
