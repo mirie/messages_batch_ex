@@ -1,6 +1,4 @@
-"""Stage 2: the extract_invoice tool, the "blank form" Claude fills in.
-
-Run:  uv run schema.py     (prints the definition; no API call, no key needed)
+"""The extract_invoice tool, the "blank form" Claude fills in.
 
 Why a tool? With tool_choice forcing this tool, Claude's whole answer IS the
 tool call. Nothing has to run on our side, so it works inside a batch even
@@ -10,8 +8,6 @@ Nullable fields ("type": ["string", "null"]) let Claude say "not on the page"
 instead of inventing a value. strict: true makes the API guarantee the tool
 input matches this schema exactly (right keys, right types).
 """
-
-import json
 
 from pydantic import BaseModel
 
@@ -95,21 +91,3 @@ class InvoiceExtraction(BaseModel):
     total: float | None
     issues: list[str]
 
-
-if __name__ == "__main__":
-    from common import ESCALATION_MODEL, MODEL, tool_choice_for
-
-    print("=== The tool definition sent with every request ===\n")
-    print(json.dumps(EXTRACT_INVOICE_TOOL, indent=2))
-    print("\n=== Fields at a glance ===\n")
-    props = EXTRACT_INVOICE_TOOL["input_schema"]["properties"]
-    for name, spec in props.items():
-        t = spec["type"]
-        t = " or ".join(t) if isinstance(t, list) else t
-        print(f"  {name:<15} {t}")
-    print("\n=== tool_choice per model ===\n")
-    for m in (MODEL, ESCALATION_MODEL):
-        print(f"  {m:<20} {json.dumps(tool_choice_for(m))}")
-    print("\n  Forced ({'type': 'tool'}) means the reply can only be this tool call.")
-    print("  'auto' is used where the model rejects forced tool use (400 error);")
-    print("  the prompt then asks for the tool, and strict: true still guarantees the shape.")

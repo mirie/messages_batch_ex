@@ -1,6 +1,6 @@
 """Stage 3: extract 4 documents with the normal (synchronous) Messages API.
 
-Run:  uv run dry_run.py
+Run:  uv run dry-run
 
 Same request shape the batch will use, but one call at a time, so you see
 each answer immediately. Includes the corrupt PDF so you can see what an
@@ -12,7 +12,9 @@ import time
 
 import anthropic
 
-from common import MODEL, build_params, cost_usd, make_client, pdf_path_for
+from invoice_batch.config import MODEL, make_client, pdf_path_for
+from invoice_batch.pricing import cost_usd
+from invoice_batch.request_builder import build_params
 
 DOCS = ["01_clean_classic", "19_unusual_format", "22_letter", "21_corrupt"]
 

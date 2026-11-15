@@ -1,6 +1,8 @@
 [project]
 name = "messages-batch-ex"
 version = "0.1.0"
+description = "Learning project: extracting fake invoices with the Claude Message Batches API"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=2.8.0",
@@ -8,3 +10,25 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "reportlab>=5.1.0",
 ]
+
+# One command per stage:  uv run <command>
+[project.scripts]
+generate-invoices = "invoice_batch.cli.generate_invoices:main"
+show-schema = "invoice_batch.cli.show_schema:main"
+dry-run = "invoice_batch.cli.dry_run:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "invoice_batch"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
