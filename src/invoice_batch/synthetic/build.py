@@ -28,7 +28,8 @@ ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII
 
 
 def _save_pdf(invoices_dir: Path, name: str, draw) -> None:
-    c = canvas.Canvas(str(invoices_dir / f"{name}.pdf"), pagesize=letter)
+    # invariant: no creation timestamp or random document ID, so bytes are reproducible
+    c = canvas.Canvas(str(invoices_dir / f"{name}.pdf"), pagesize=letter, invariant=True)
     c.setTitle(name)
     draw(c)
     c.showPage()

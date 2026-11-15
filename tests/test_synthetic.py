@@ -72,3 +72,10 @@ def test_generating_twice_gives_identical_ground_truth(tmp_path):
     generate(tmp_path / "b")
     assert (tmp_path / "a" / "ground_truth.json").read_text() == \
         (tmp_path / "b" / "ground_truth.json").read_text()
+
+
+def test_generating_twice_gives_byte_identical_pdfs(tmp_path):
+    generate(tmp_path / "a")
+    generate(tmp_path / "b")
+    for pdf in sorted((tmp_path / "a" / "invoices").glob("*.pdf")):
+        assert pdf.read_bytes() == (tmp_path / "b" / "invoices" / pdf.name).read_bytes(), pdf.name
