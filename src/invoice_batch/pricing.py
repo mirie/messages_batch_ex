@@ -13,7 +13,7 @@ def cost_usd(usage: dict, model: str, batch: bool = True) -> float:
     """Cost of one response, from its usage dict."""
     p = PRICES.get(model)
     if p is None:
-        return 0.0
+        raise ValueError(f"No price for model {model!r}; add it to PRICES in pricing.py")
     dollars = (
         usage.get("input_tokens", 0) * p["input"]
         + usage.get("output_tokens", 0) * p["output"]
