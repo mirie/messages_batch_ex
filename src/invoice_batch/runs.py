@@ -60,7 +60,10 @@ def resolve_batch(arg: str | None, runs_dir: Path) -> tuple[str, Path | None]:
 
 
 def load_batch_record(run_dir: Path) -> dict:
-    """batch.json as a dict; an unreadable file is a clear error naming it."""
+    """Read the run folder's batch.json and return it as a dict.
+
+    If the file is missing or isn't valid JSON, stop with an error that says which file.
+    """
     path = run_dir / BATCH_RECORD
     try:
         return json.loads(path.read_text())
