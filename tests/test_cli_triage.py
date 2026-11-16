@@ -103,3 +103,25 @@ def test_it_works_without_predictions_or_ground_truth(run, capsys, monkeypatch, 
     assert "no predictions.json" in out
     assert "no ground truth" in out
     assert (run / "triage.json").exists()
+
+
+def test_a_retry_round_uses_the_parent_runs_results_as_history(tmp_path, monkeypatch):
+    # Round 2 returned the same wrong total as round 1, so retrying again
+    # can't help: STABLE_ANSWER, attempt 2.
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(triage, "RUNS_DIR", runs)
+    monkeypatch.setattr(triage, "GROUND_TRUTH", tmp_path / "none.json")
+    same = _record("20_total_mismatch", total=110.0)
+    r1 = make_run(runs, "r1", batch_id="b1", custom_ids=IDS)
+    (r1 / "results.jsonl").write_text(json.dumps(same) + "\n")
+    r2 = make_run(
+        runs, "r2", batch_id="b2", custom_ids=["20_total_mismatch"], round=2, parent_run="r1"
+    )
+    (r2 / "results.jsonl").write_text(json.dumps(same) + "\n")
+
+    triage.main(["r2"])
+
+    saved = json.loads((r2 / "triage.json").read_text())
+    (doc,) = saved["documents"]
+    assert (doc["class"], doc["attempt"]) == ("STABLE_ANSWER", 2)
+    assert saved["round"] == 2

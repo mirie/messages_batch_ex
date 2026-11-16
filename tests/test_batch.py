@@ -152,3 +152,17 @@ def test_worst_rounds_is_every_doc_failing_every_round_with_the_last_on_escalati
     sonnet = estimate_batch_cost(23, "claude-sonnet-5-5")["worst"]
     worst = estimate_worst_rounds(23, "claude-haiku-5-5", "claude-sonnet-5-5", rounds=3)
     assert worst == pytest.approx(haiku + haiku + sonnet)
+
+
+def test_batch_record_can_carry_retry_fields(tmp_path, pdf_dir):
+    # A retry round records where it came from and the hints it sent.
+    reqs = build_requests(["01_a"], pdf_dir=pdf_dir)
+    extra = {"round": 2, "parent_run": "r1", "hints": {"01_a": "total is missing."}}
+    path = write_batch_record(
+        tmp_path, submit(fake_client(), reqs), reqs, datetime.now(UTC), extra=extra
+    )
+    record = json.loads(path.read_text())
+    assert record["round"] == 2
+    assert record["parent_run"] == "r1"
+    assert record["hints"] == {"01_a": "total is missing."}
+    assert record["custom_ids"] == ["01_a"]

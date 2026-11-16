@@ -20,6 +20,7 @@ submit-batch = "invoice_batch.cli.submit_batch:main"
 check-batch = "invoice_batch.cli.check_batch:main"
 collect-results = "invoice_batch.cli.collect_results:main"
 triage = "invoice_batch.cli.triage:main"
+retry-batch = "invoice_batch.cli.retry_batch:main"
 
 [dependency-groups]
 dev = [

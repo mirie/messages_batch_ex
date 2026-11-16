@@ -4,7 +4,7 @@ A small Python learning project that extracts fields from fake PDF invoices with
 
 This is a self-directed experiment. It uses 23 generated invoices, some clean and some deliberately broken, to show what the Batches API does with tool calls, timing, cost, retries, and failures.
 
-Status: stages 1–7 are built (test data, JSON schema, synchronous dry run, batch submit, status, results, triage). Batch stages are added one at a time.
+Status: stages 1–8 are built (test data, JSON schema, synchronous dry run, batch submit, status, results, triage, one retry round). Batch stages are added one at a time.
 
 ## Setup
 
@@ -50,8 +50,9 @@ Each stage is a command registered in `pyproject.toml` under `[project.scripts]`
 | 5 | `uv run check-batch [--watch]` | Yes, but free (status only). Updates `batch.json` |
 | 6 | `uv run collect-results` | Yes, but free (downloads results). Writes `results.jsonl` |
 | 7 | `uv run triage` | No. Writes `triage.json` and prints predicted vs. actual |
+| 8 | `uv run retry-batch` | Only with `--yes`. Submits the retryable documents as the next round, in a new run folder |
 
-`check-batch`, `collect-results` and `triage` use the newest run by default. You can also pass a run folder (`runs/20261116-011243` or just `20261116-011243`) or a batch id.
+`check-batch`, `collect-results`, `triage` and `retry-batch` use the newest run by default. You can also pass a run folder (`runs/20261116-011243` or just `20261116-011243`) or a batch id.
 
 ## Test
 
@@ -120,6 +121,24 @@ messages[0] user:
               (+ a hint on retries)
 ```
 
+### Retry rounds
+
+`retry-batch` reads the newest `triage.json` and submits only the documents in a `RETRY_*` class, as a new batch in a new run folder. The new `batch.json` records `round` and `parent_run`, so `triage` in that folder can follow the link back and see the earlier attempts.
+
+```
+runs/20261116-040415/   round 1   23 docs   triage: 20_total_mismatch RETRY_WITH_HINT
+        ▲ parent_run
+runs/<new stamp>/       round 2    1 doc    triage (with round-1 history): same values -> STABLE_ANSWER
+```
+
+| Class | Next round's model | Hint |
+| --- | --- | --- |
+| `RETRY_WITH_HINT` | `MODEL` | the failed checks from `triage.json` |
+| `RETRY_SAME` | same as last time | same as last time (the request is unchanged) |
+| `RETRY_ESCALATE` | `ESCALATION_MODEL` | the failed checks from `triage.json` |
+
+A run that already has a retry round can't be retried again, so the same round isn't paid for twice.
+
 ## Code organization
 
 The code is a package in `src/invoice_batch/`. Library modules hold the logic and are covered by tests; `cli/` holds thin commands that call them and print results.
@@ -135,6 +154,7 @@ src/invoice_batch/
 ├── status.py            describe(), watch(), update_batch_record()
 ├── results.py           record_from_result(), collect(), results.jsonl
 ├── triage.py            the failure policy: check_extraction(), triage_one(), triage_run()
+├── retry.py             plan_retries(), load_histories() (follows parent_run links)
 ├── compare.py           learning only: truth_diffs(), expected/prediction verdicts
 ├── synthetic/           the fake test set
 │   ├── data.py          vendors, customers, make_invoice(), truth_of()
@@ -147,7 +167,8 @@ src/invoice_batch/
     ├── submit_batch.py
     ├── check_batch.py
     ├── collect_results.py
-    └── triage.py
+    ├── triage.py
+    └── retry_batch.py
 tests/                   pytest, one file per library module
 ```
 

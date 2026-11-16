@@ -4,7 +4,8 @@ Run:  uv run triage                       newest run in runs/
       uv run triage 20261116-011243       a specific run folder (or runs/...)
 
 Free and offline: reads batch.json and results.jsonl, writes triage.json next
-to them. Then, for learning, prints a comparison with my predictions
+to them. In a retry round, earlier attempts come from the parent runs'
+results.jsonl. Then, for learning, prints a comparison with my predictions
 (predictions.json in the run folder, optional) and with ground truth
 (data/ground_truth.json, optional). Ground truth never changes a class.
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 from invoice_batch.compare import expected_verdict, prediction_verdict, truth_diffs
 from invoice_batch.config import GROUND_TRUTH, RUNS_DIR
 from invoice_batch.results import read_results_jsonl
+from invoice_batch.retry import load_histories
 from invoice_batch.runs import (
     add_batch_argument,
     display_path,
@@ -101,7 +103,9 @@ def main(argv: list[str] | None = None) -> None:
 
     records = read_results_jsonl(results_path)
     round_no = record.get("round", 1)
-    decisions = triage_run(record.get("custom_ids", []), records, histories={})
+    decisions = triage_run(
+        record.get("custom_ids", []), records, histories=load_histories(run_dir, RUNS_DIR)
+    )
     counts = Counter(d["class"] for d in decisions)
 
     path = run_dir / "triage.json"

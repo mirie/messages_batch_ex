@@ -70,9 +70,16 @@ def submit(client, requests: list[dict]):
     return client.messages.batches.create(requests=requests)
 
 
-def write_batch_record(run_dir: Path, batch, requests: list[dict], submitted_at: datetime) -> Path:
+def write_batch_record(
+    run_dir: Path,
+    batch,
+    requests: list[dict],
+    submitted_at: datetime,
+    extra: dict | None = None,
+) -> Path:
     """Save what check-batch and collect-results need: the batch id, the times,
-    and each document's id and model.
+    and each document's id and model. `extra` adds fields such as a retry
+    round's round, parent_run and hints.
 
     The request bodies are left out: the base64 PDFs are large and can be
     rebuilt from data/.
@@ -86,6 +93,7 @@ def write_batch_record(run_dir: Path, batch, requests: list[dict], submitted_at:
         "processing_status": batch.processing_status,
         "custom_ids": [r["custom_id"] for r in requests],
         "models": {r["custom_id"]: r["params"]["model"] for r in requests},
+        **(extra or {}),
     }
     path = run_dir / BATCH_RECORD
     write_json_atomic(path, record)
