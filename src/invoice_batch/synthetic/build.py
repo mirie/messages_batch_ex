@@ -1,4 +1,4 @@
-"""Builds the 23-document test set and its ground truth.
+"""Builds the 26-document test set and its ground truth.
 
 Documents (custom_id = filename stem):
   01-16  clean invoices in 3 layouts (06 genuinely has no due date)
@@ -9,6 +9,9 @@ Documents (custom_id = filename stem):
   21     corrupt PDF: random bytes with a .pdf name
   22     a business letter (not an invoice)
   23     a blank page
+  24     image-only degraded scan with easily confused digits in the line items
+  25     image-only scan with a quantity crossed out and rewritten by hand
+  26     image-only fax-quality scan with a stain over a price
 """
 
 import json
@@ -25,6 +28,12 @@ from invoice_batch.synthetic.layouts import (
     layout_cluttered,
     layout_compact,
     layout_modern,
+)
+from invoice_batch.synthetic.scan import (
+    ScanPage,
+    draw_scanned_invoice,
+    make_scanned,
+    save_image_pdf,
 )
 
 LAYOUTS = {"classic": layout_classic, "modern": layout_modern, "compact": layout_compact}
@@ -186,7 +195,114 @@ def generate(out_dir: Path, seed: int = 42) -> list[dict]:
     save("23_blank", lambda c: None)
     add("23_blank", "not_retryable", "blank", "NO_RETRY", "A blank page; nothing to extract.", None)
 
+    # Everything below was added after real batches ran on 01-23. It must stay
+    # after 23_blank, so that 01-23 keep getting the same random values.
+    _add_scanned_documents(rng, invoices_dir, add)
+
     (out_dir / "ground_truth.json").write_text(
         json.dumps({"documents": docs}, indent=2, ensure_ascii=False)
     )
     return docs
+
+
+def _with_items(inv: dict, items: list[tuple[str, int, float]]) -> dict:
+    """Replace the invoice's line items with fixed ones and recompute its total."""
+    inv["line_items"] = [
+        {"description": description, "quantity": quantity, "unit_price": unit_price}
+        for description, quantity, unit_price in items
+    ]
+    inv["total"] = items_total(inv["line_items"])
+    return inv
+
+
+def _add_scanned_documents(rng, invoices_dir: Path, add) -> None:
+    """Build documents 24-26: image-only scans with no text layer for Claude to fall back on.
+
+    Each source invoice is self-consistent: its line items add up to its total.
+    A misread line item therefore breaks the sum check, which triage can see.
+    """
+    # 24: a poor scan, with easily confused digits (3/8, 1/7, 5/6) in small
+    # line items and a large, bold total that stays readable. There is no
+    # line-amount column, so a misread price cannot be checked against its row.
+    inv24 = _with_items(
+        make_invoice(rng, 24, currency="USD"),
+        [
+            ("Toner cartridge, black", 3, 38.83),
+            ("Spiral notebooks (10-pack)", 7, 17.71),
+            ("Business cards (500)", 5, 65.56),
+        ],
+    )
+    page = ScanPage()
+    draw_scanned_invoice(page, inv24, item_size=8, total_size=15, show_amounts=False)
+    scan = make_scanned(page, rng, scan_dpi=80, tilt_degrees=1.2, blur_radius=0.9, noise=0.2)
+    save_image_pdf(invoices_dir / "24_degraded_scan.pdf", "24_degraded_scan", scan)
+    add(
+        "24_degraded_scan",
+        "hard",
+        "scan",
+        "RETRY_ESCALATE",
+        "Image-only, low-resolution, blurred and tilted scan. Small line items use the "
+        "easily confused digits 3/8, 1/7 and 5/6, while the total is large and clear, so "
+        "a misread breaks the sum. Expected to survive a hint and need the bigger model.",
+        truth_of(inv24),
+    )
+
+    # 25: a printed quantity crossed out and corrected by hand. There is no
+    # line-amount column, so the printed total is the only way to check it.
+    inv25 = make_invoice(rng, 25)
+    correction = {"line_index": 0, "crossed_out_quantity": 4, "handwritten_quantity": 6}
+    inv25["line_items"][0]["quantity"] = correction["handwritten_quantity"]
+    inv25["total"] = items_total(inv25["line_items"])
+    page = ScanPage()
+    quantity_boxes = draw_scanned_invoice(
+        page,
+        inv25,
+        show_amounts=False,
+        printed_quantities={0: correction["crossed_out_quantity"]},
+    )
+    page.cross_out_and_rewrite(quantity_boxes[0], str(correction["handwritten_quantity"]), rng)
+    scan = make_scanned(page, rng, scan_dpi=150, tilt_degrees=0.5, blur_radius=0.4, noise=0.08)
+    save_image_pdf(
+        invoices_dir / "25_handwritten_correction.pdf", "25_handwritten_correction", scan
+    )
+    add(
+        "25_handwritten_correction",
+        "hard",
+        "scan",
+        "RETRY_WITH_HINT",
+        "Image-only scan. The first quantity is printed as 4, crossed out, and rewritten "
+        "by hand as 6. The printed total uses 6, so reading 4 breaks the sum and the "
+        "hint points at the mismatch.",
+        truth_of(inv25),
+        {"correction": correction},
+    )
+
+    # 26: a fax-quality scan with a stain over one price. Even the bigger model
+    # should have to guess, ideally differently each time.
+    inv26 = _with_items(
+        make_invoice(rng, 26, currency="EUR"),
+        [
+            ("On-site support (hours)", 7, 81.38),
+            ("Mulch delivery (cubic yard)", 3, 56.17),
+            ("Walnut cutting board", 1, 138.65),
+            ("Poster print A2", 8, 13.87),
+        ],
+    )
+    page = ScanPage()
+    draw_scanned_invoice(page, inv26, item_size=7, total_size=16, show_amounts=False)
+    page.stain(562 - 25, 590 - 2 * 7 * 2.2 + 2, 60, 22)
+    scan = make_scanned(
+        page, rng, scan_dpi=72, tilt_degrees=2.0, blur_radius=0.7, noise=0.2, threshold=185
+    )
+    save_image_pdf(invoices_dir / "26_illegible_scan.pdf", "26_illegible_scan", scan)
+    add(
+        "26_illegible_scan",
+        "hard",
+        "scan",
+        "MAX_ATTEMPTS",
+        "Image-only fax-quality scan (black and white, 72 dpi, tilted) with a stain over "
+        "the second unit price. Hoped for: every attempt, including the bigger model, "
+        "guesses differently. If the bigger model repeats its answer, triage says "
+        "STABLE_ANSWER instead.",
+        truth_of(inv26),
+    )

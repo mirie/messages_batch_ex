@@ -1,4 +1,4 @@
-"""Create the 23 test PDFs and data/ground_truth.json.
+"""Create the 26 test PDFs and data/ground_truth.json.
 
 Run:  uv run generate-invoices     (no API call)
 """
