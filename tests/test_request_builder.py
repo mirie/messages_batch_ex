@@ -68,3 +68,12 @@ def test_hint_is_appended_to_the_user_text(pdf):
 def test_no_hint_means_the_plain_instruction(pdf):
     text = user_content(build_params(pdf, "claude-haiku-5-5"))[1]["text"]
     assert "previous attempt" not in text
+
+
+def test_thinking_is_adaptive_with_a_readable_summary(pdf):
+    # adaptive: the model decides whether to think; summarized: we can read
+    # what it thought about (display changes visibility only, not billing).
+    assert build_params(pdf, "claude-haiku-5-5")["thinking"] == {
+        "type": "adaptive",
+        "display": "summarized",
+    }

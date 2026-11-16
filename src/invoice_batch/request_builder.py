@@ -77,6 +77,10 @@ def build_params(pdf_path: Path, model: str = MODEL, hint: str | None = None) ->
                 "cache_control": {"type": "ephemeral", "ttl": "1h"},
             }
         ],
+        # Adaptive: the model decides whether a document is worth thinking about
+        # (the letter usually gets none). Summarized: return a readable summary
+        # instead of an empty thinking block. Billing is the same either way.
+        "thinking": {"type": "adaptive", "display": "summarized"},
         "output_config": {"format": OUTPUT_FORMAT},
         "messages": [
             {"role": "user", "content": [pdf_block(pdf_path), {"type": "text", "text": text}]}

@@ -107,6 +107,7 @@ Neither forces the other: JSON outputs never produce a tool call, and `strict` d
 
 ```
 system  (cache_control, 1h)       identical for every document, so it can be cached
+thinking  adaptive, summarized   the model decides whether to think; we can read a summary
 output_config.format              the invoice JSON schema (same for every document)
 messages[0] user:
     document  (base64 PDF)

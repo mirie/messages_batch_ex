@@ -51,7 +51,8 @@ def main() -> None:
                 print("raw text block (the JSON reply):")
                 print(block.text)
             elif block.type == "thinking":
-                print(f"thinking block ({len(block.thinking)} chars shown)")
+                print("thinking (summary):")
+                print(f"  {block.thinking.strip()}")
         parsed = parse_extraction(msg.content)
         print("parsed into InvoiceExtraction:")
         print(json.dumps(parsed.model_dump(), indent=2, ensure_ascii=False))
