@@ -98,14 +98,29 @@ def _cost(usage: dict, model: str | None) -> tuple[float | None, str | None]:
         return None, str(e)
 
 
-def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str]]:
-    """Records sorted by custom_id, plus any expected ids with no result."""
-    by_id = {}
+def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str], list[str]]:
+    """Records sorted by custom_id, expected ids with no result, and warnings.
+
+    The API promises one result per custom_id, so duplicates, ids that
+    batch.json doesn't list, and results with no id should never happen.
+    If they do, they are reported, not silently absorbed.
+    """
+    by_id: dict[str, dict] = {}
+    warnings = []
+    expected = set(expected_ids)
     for raw in raws:
         rec = record_from_result(raw)
-        by_id[rec["custom_id"]] = rec
+        cid = rec["custom_id"]
+        if not cid:
+            warnings.append(f"skipped a {rec['result_type']} result with no custom_id")
+            continue
+        if cid in by_id:
+            warnings.append(f"duplicate result for {cid} (kept the last one)")
+        elif cid not in expected:
+            warnings.append(f"result for {cid}, which is not in batch.json")
+        by_id[cid] = rec
     missing = [cid for cid in expected_ids if cid not in by_id]
-    return [by_id[cid] for cid in sorted(by_id)], missing
+    return [by_id[cid] for cid in sorted(by_id)], missing, warnings
 
 
 def total_cost(records: list[dict]) -> float:

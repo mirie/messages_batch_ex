@@ -88,3 +88,18 @@ def test_an_unpriced_model_still_saves_results_and_warns(run, monkeypatch, capsy
     assert (run / "results.jsonl").exists()
     assert "$?" in out
     assert "COST UNKNOWN" in out and "claude-unpriced-9" in out
+
+
+def test_print_record_copes_with_missing_fields(capsys):
+    rec = {
+        "custom_id": "01_x",
+        "result_type": "succeeded",
+        "stop_reason": None,
+        "usage": {},
+        "cost_usd": 0.0,
+        "parse_ok": True,
+        "extraction": {"is_invoice": True, "total": 5.0},  # most keys missing
+    }
+    collect_results.print_record(rec)
+    out = capsys.readouterr().out
+    assert "01_x" in out and "total 5.0" in out

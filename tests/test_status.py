@@ -142,6 +142,62 @@ def test_watch_polls_until_ended_and_prints_one_line_per_poll():
     assert "ended" in lines[2]
 
 
+class FlakyNetwork(Exception):
+    pass
+
+
+def test_watch_rides_out_a_transient_error_and_keeps_polling():
+    statuses = [
+        batch_status("in_progress", processing=23, created_at=CREATED),
+        FlakyNetwork("connection reset"),
+        batch_status("ended", succeeded=23, created_at=CREATED, ended_at=CREATED),
+    ]
+    clock = FakeClock(CREATED)
+    lines = []
+    final = watch(
+        fake_status_client(statuses),
+        "msgbatch_x",
+        interval=60,
+        now=clock.now,
+        sleep=clock.sleep,
+        out=lines.append,
+        transient=(FlakyNetwork,),
+    )
+    assert final.processing_status == "ended"
+    assert clock.slept == [60, 60]
+    assert "connection reset" in lines[1] and "trying again" in lines[1]
+
+
+def test_watch_gives_up_after_too_many_errors_in_a_row():
+    statuses = [FlakyNetwork("down")] * 3
+    clock = FakeClock(CREATED)
+    with pytest.raises(FlakyNetwork):
+        watch(
+            fake_status_client(statuses),
+            "msgbatch_x",
+            interval=60,
+            now=clock.now,
+            sleep=clock.sleep,
+            out=lambda _: None,
+            transient=(FlakyNetwork,),
+            max_errors=3,
+        )
+    assert clock.slept == [60, 60]  # no sleep before giving up
+
+
+def test_watch_does_not_retry_errors_that_are_not_transient():
+    clock = FakeClock(CREATED)
+    with pytest.raises(KeyError):
+        watch(
+            fake_status_client([KeyError("bug")]),
+            "msgbatch_x",
+            now=clock.now,
+            sleep=clock.sleep,
+            out=lambda _: None,
+            transient=(FlakyNetwork,),
+        )
+
+
 # --- update_batch_record: keep batch.json in step with the API --------------------
 
 

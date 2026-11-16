@@ -58,7 +58,10 @@ def batch_status(
 
 
 class FakeStatusBatches:
-    """client.messages.batches whose retrieve() replays a list of statuses."""
+    """client.messages.batches whose retrieve() replays a list of statuses.
+
+    An Exception in the list is raised instead of returned.
+    """
 
     def __init__(self, statuses):
         self._statuses = list(statuses)
@@ -66,7 +69,10 @@ class FakeStatusBatches:
 
     def retrieve(self, batch_id):
         self.retrieved.append(batch_id)
-        return self._statuses.pop(0)
+        status = self._statuses.pop(0)
+        if isinstance(status, Exception):  # simulate a failed API call
+            raise status
+        return status
 
 
 def fake_status_client(statuses):

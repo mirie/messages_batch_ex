@@ -19,10 +19,12 @@ CUSTOM_ID_RE = re.compile(r"[a-zA-Z0-9_-]{1,64}")
 MAX_REQUESTS = 100_000
 MAX_BATCH_BYTES = 256 * 1024 * 1024  # 256 MB
 
-# Measured in the stage 3 dry run on Haiku 5.5 (per document).
+# Measured in the stage 3 dry run on Haiku 5.5 (per document), and confirmed by
+# the first real batch (runs/20261116-011243): input ~1,800, output 300-500,
+# prefix 1,608.
 DRY_RUN_INPUT_TOKENS = 2000  # uncached part: the PDF + the user text
-DRY_RUN_OUTPUT_TOKENS = 500  # the tool call JSON
-DRY_RUN_PREFIX_TOKENS = 1612  # tools + system prompt, the cached prefix
+DRY_RUN_OUTPUT_TOKENS = 500  # the JSON reply, thinking tokens included
+DRY_RUN_PREFIX_TOKENS = 1612  # everything up to the system prompt breakpoint (cached)
 
 
 def build_requests(

@@ -136,13 +136,31 @@ def test_collect_matches_by_custom_id_not_order_and_flags_missing_ones():
         errored_result("03_c"),
         succeeded_result("01_a", [text(GOOD)]),
     ]
-    records, missing = collect(raws, expected_ids=["01_a", "02_b", "03_c", "04_d"])
+    records, missing, warnings = collect(raws, expected_ids=["01_a", "02_b", "03_c", "04_d"])
     assert [r["custom_id"] for r in records] == ["01_a", "02_b", "03_c"]
     assert missing == ["04_d"]
+    assert warnings == []
+
+
+def test_collect_warns_about_duplicate_unexpected_and_id_less_results():
+    raws = [
+        succeeded_result("01_a", [text(GOOD)]),
+        errored_result("01_a"),  # same id again: the last one wins
+        succeeded_result("99_stray", [text(GOOD)]),
+        {"custom_id": None, "result": {"type": "expired"}},
+    ]
+    records, missing, warnings = collect(raws, expected_ids=["01_a"])
+    assert [r["custom_id"] for r in records] == ["01_a", "99_stray"]
+    assert records[0]["result_type"] == "errored"
+    assert missing == []
+    text_ = " | ".join(warnings)
+    assert "duplicate" in text_ and "01_a" in text_
+    assert "99_stray" in text_ and "not in batch.json" in text_
+    assert "no custom_id" in text_
 
 
 def test_total_cost_adds_up_only_billed_results():
-    records, _ = collect(
+    records, *_ = collect(
         [succeeded_result("01_a", [text(GOOD)]), errored_result("02_b")],
         expected_ids=["01_a", "02_b"],
     )
@@ -150,7 +168,7 @@ def test_total_cost_adds_up_only_billed_results():
 
 
 def test_results_jsonl_round_trips(tmp_path):
-    records, _ = collect([succeeded_result("01_a", [text(GOOD)])], expected_ids=["01_a"])
+    records, *_ = collect([succeeded_result("01_a", [text(GOOD)])], expected_ids=["01_a"])
     path = write_results_jsonl(tmp_path, records)
     assert path.name == "results.jsonl"
     assert read_results_jsonl(path) == records

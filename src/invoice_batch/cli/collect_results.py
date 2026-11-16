@@ -25,12 +25,14 @@ def _usage_text(usage: dict) -> str:
 
 
 def _extraction_text(ex: dict) -> str:
-    if not ex["is_invoice"]:
-        return f"is_invoice false | issues: {'; '.join(ex['issues']) or 'none'}"
+    issues = "; ".join(ex.get("issues") or []) or "none"
+    if not ex.get("is_invoice"):
+        return f"is_invoice false | issues: {issues}"
     return (
-        f"{ex['invoice_no']} | {ex['vendor']} | total {ex['total']} {ex['currency']} | "
-        f"issued {ex['issue_date']} due {ex['due_date']} | {len(ex['line_items'])} items | "
-        f"issues: {'; '.join(ex['issues']) or 'none'}"
+        f"{ex.get('invoice_no')} | {ex.get('vendor')} | "
+        f"total {ex.get('total')} {ex.get('currency')} | "
+        f"issued {ex.get('issue_date')} due {ex.get('due_date')} | "
+        f"{len(ex.get('line_items') or [])} items | issues: {issues}"
     )
 
 
@@ -42,8 +44,8 @@ def print_record(rec: dict) -> None:
     cid, kind = rec["custom_id"], rec["result_type"]
     if kind == "succeeded":
         print(
-            f"{cid:<26} succeeded  {rec['stop_reason']:<10} "
-            f"{_usage_text(rec['usage'])}  {_cost_text(rec)}"
+            f"{cid:<26} succeeded  {rec.get('stop_reason') or '-':<10} "
+            f"{_usage_text(rec.get('usage') or {})}  {_cost_text(rec)}"
         )
         if rec["parse_ok"]:
             print(f"{'':<26} {_extraction_text(rec['extraction'])}")
@@ -75,7 +77,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     raws = (item.model_dump(mode="json") for item in client.messages.batches.results(batch_id))
-    records, missing = collect(raws, expected_ids=expected)
+    records, missing, warnings = collect(raws, expected_ids=expected)
     path = write_results_jsonl(run_dir, records)
 
     print(f"Results for {batch_id}  ({len(records)} results, in custom_id order)\n")
@@ -84,10 +86,14 @@ def main(argv: list[str] | None = None) -> None:
 
     billed = [r for r in records if r["result_type"] == "succeeded"]
     failed = [r for r in billed if not r["parse_ok"]]
-    cache_reads = sum(1 for r in billed if (r["usage"].get("cache_read_input_tokens") or 0) > 0)
+    cache_reads = sum(
+        1 for r in billed if ((r["usage"] or {}).get("cache_read_input_tokens") or 0) > 0
+    )
     print()
     if missing:
         print(f"MISSING results for: {', '.join(missing)}")
+    for warning in warnings:
+        print(f"WARNING: {warning}")
     counts = {}
     for r in records:
         counts[r["result_type"]] = counts.get(r["result_type"], 0) + 1

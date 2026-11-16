@@ -15,7 +15,17 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import anthropic
+
 COUNT_FIELDS = ("processing", "succeeded", "errored", "canceled", "expired")
+
+# Worth waiting out during a long --watch (the SDK has already retried a few
+# times by the time one of these reaches us). Anything else is a real problem.
+TRANSIENT_ERRORS = (
+    anthropic.APIConnectionError,  # includes timeouts
+    anthropic.InternalServerError,  # any 5xx, including 529 overloaded
+    anthropic.RateLimitError,
+)
 
 
 def resolve_batch(arg: str | None, runs_dir: Path) -> tuple[str, Path | None]:
@@ -123,10 +133,29 @@ def watch(
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleep: Callable[[float], None] = time.sleep,
     out: Callable[[str], None] = print,
+    transient: tuple[type[Exception], ...] = TRANSIENT_ERRORS,
+    max_errors: int = 5,
 ):
-    """Poll until processing_status is "ended"; one timestamped line per poll."""
+    """Poll until processing_status is "ended"; one timestamped line per poll.
+
+    A transient error prints a line and the next poll tries again; after
+    max_errors in a row it gives up and re-raises.
+    """
+    errors_in_a_row = 0
     while True:
-        batch = client.messages.batches.retrieve(batch_id)
+        try:
+            batch = client.messages.batches.retrieve(batch_id)
+        except transient as e:
+            errors_in_a_row += 1
+            if errors_in_a_row >= max_errors:
+                raise
+            out(
+                f"[{now().astimezone(UTC):%H:%M:%S}] retrieve failed ({type(e).__name__}: {e}); "
+                f"trying again in {interval:g}s ({errors_in_a_row}/{max_errors})"
+            )
+            sleep(interval)
+            continue
+        errors_in_a_row = 0
         out(poll_line(batch, now()))
         if batch.processing_status == "ended":
             return batch
