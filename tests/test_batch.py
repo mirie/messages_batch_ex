@@ -47,6 +47,15 @@ def test_hints_go_only_to_their_own_document(pdf_dir):
     assert "total mismatch" not in texts["01_a"]
 
 
+def test_models_override_the_default_per_document_and_keep_the_order(pdf_dir):
+    # A retry round can mix models: escalated documents go to Sonnet.
+    reqs = build_requests(["01_a", "02_b"], model=HAIKU, models={"01_a": SONNET}, pdf_dir=pdf_dir)
+    assert [(r["custom_id"], r["params"]["model"]) for r in reqs] == [
+        ("01_a", SONNET),
+        ("02_b", HAIKU),
+    ]
+
+
 def test_every_request_shares_the_same_cached_prefix(pdf_dir):
     reqs = build_requests(["01_a", "02_b", "03_c"], pdf_dir=pdf_dir)
     prefixes = {json.dumps([r["params"]["system"], r["params"]["output_config"]]) for r in reqs}

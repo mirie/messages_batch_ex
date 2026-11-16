@@ -31,7 +31,7 @@ from invoice_batch.triage import ATTEMPT_LIMIT
 
 def _estimate(plan: list[dict]) -> dict[str, float]:
     """Typical and worst cost of this round, summed per model (each model has its own cache)."""
-    per_model = Counter(p["model"] for p in plan)
+    per_model = Counter(retry["model"] for retry in plan)
     totals = {"typical": 0.0, "worst": 0.0}
     for model, n in per_model.items():
         est = estimate_batch_cost(n, model)
@@ -70,23 +70,19 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Nothing to retry in {run_dir.name}: no RETRY_* documents in triage.json.")
         return
 
-    ids = [p["custom_id"] for p in plan]
-    requests = []
-    for model in dict.fromkeys(p["model"] for p in plan):  # one build per model, keep order
-        group = [p for p in plan if p["model"] == model]
-        requests += build_requests(
-            [p["custom_id"] for p in group],
-            model=model,
-            hints={p["custom_id"]: p["hint"] for p in group if p["hint"]},
-            pdf_dir=INVOICES_DIR,
-        )
-    requests.sort(key=lambda r: ids.index(r["custom_id"]))
+    ids = [retry["custom_id"] for retry in plan]
+    requests = build_requests(
+        ids,
+        models={retry["custom_id"]: retry["model"] for retry in plan},
+        hints={retry["custom_id"]: retry["hint"] for retry in plan if retry["hint"]},
+        pdf_dir=INVOICES_DIR,
+    )
     check_limits(requests)
 
     print(f"Retry plan: round {round_no}, retrying {run_dir.name} ({len(plan)} documents)\n")
-    for p in plan:
-        print(f"{p['custom_id']:<26} {p['class']:<16} {p['model']}")
-        print(f"{'':<26} hint: {p['hint'] or '(none, same request as before)'}")
+    for retry in plan:
+        print(f"{retry['custom_id']:<26} {retry['class']:<16} {retry['model']}")
+        print(f"{'':<26} hint: {retry['hint'] or '(none, same request as before)'}")
 
     est = _estimate(plan)
     rounds_left = ATTEMPT_LIMIT - round_no
@@ -115,7 +111,7 @@ def main(argv: list[str] | None = None) -> None:
         "round": round_no,
         "parent_run": run_dir.name,
         "parent_batch_id": parent_record.get("batch_id"),
-        "hints": {p["custom_id"]: p["hint"] for p in plan if p["hint"]},
+        "hints": {retry["custom_id"]: retry["hint"] for retry in plan if retry["hint"]},
     }
     path = write_batch_record(new_dir, batch, requests, submitted_at, extra=extra)
 

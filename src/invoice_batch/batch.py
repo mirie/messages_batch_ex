@@ -33,10 +33,15 @@ def build_requests(
     model: str = MODEL,
     hints: dict[str, str] | None = None,
     pdf_dir: Path = INVOICES_DIR,
+    models: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Build one request per document. `hints` maps a custom_id to its retry hint;
-    other documents get the plain prompt."""
+    """Build one request per document, in the order of custom_ids.
+
+    `hints` maps a custom_id to its retry hint and `models` to a model other
+    than `model`; documents not in them get the plain prompt and `model`.
+    """
     hints = hints or {}
+    models = models or {}
     seen: set[str] = set()
     requests = []
     for cid in custom_ids:
@@ -45,7 +50,7 @@ def build_requests(
         if cid in seen:
             raise ValueError(f"duplicate custom_id {cid!r}")
         seen.add(cid)
-        params = build_params(pdf_dir / f"{cid}.pdf", model, hint=hints.get(cid))
+        params = build_params(pdf_dir / f"{cid}.pdf", models.get(cid, model), hint=hints.get(cid))
         requests.append({"custom_id": cid, "params": params})
     return requests
 

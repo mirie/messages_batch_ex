@@ -21,6 +21,7 @@ RETRY_ESCALATE can't happen yet; retry-batch and run-pipeline pass real history 
 """
 
 import re
+from collections.abc import Sequence
 from datetime import date
 
 VALID = "VALID"
@@ -97,7 +98,7 @@ def _decision(cls: str, reason: str, attempt: int, problems: list[str] | None = 
     return {"class": cls, "reason": reason, "problems": problems or [], "attempt": attempt}
 
 
-def triage_one(record: dict | None, history: list[dict] = ()) -> dict:
+def triage_one(record: dict | None, history: Sequence[dict] = ()) -> dict:
     """Classify one document's latest result. Returns {class, reason, problems, attempt}."""
     attempt = len(history) + 1
     out_of_attempts = attempt >= ATTEMPT_LIMIT

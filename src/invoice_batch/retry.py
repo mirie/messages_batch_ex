@@ -40,16 +40,22 @@ def plan_retries(
     previous_hints = parent_record.get("hints", {})
     plan = []
     for doc in triage.get("documents", []):
-        cid, cls = doc["custom_id"], doc["class"]
-        if cls == RETRY_WITH_HINT:
-            chosen, hint = model, hint_for(doc.get("problems", []))
-        elif cls == RETRY_ESCALATE:
-            chosen, hint = escalation_model, hint_for(doc.get("problems", []))
-        elif cls == RETRY_SAME:
-            chosen, hint = previous_models.get(cid, model), previous_hints.get(cid)
+        custom_id = doc["custom_id"]
+        triage_class = doc["class"]
+        if triage_class == RETRY_WITH_HINT:
+            next_model = model
+            hint = hint_for(doc.get("problems", []))
+        elif triage_class == RETRY_ESCALATE:
+            next_model = escalation_model
+            hint = hint_for(doc.get("problems", []))
+        elif triage_class == RETRY_SAME:
+            next_model = previous_models.get(custom_id, model)
+            hint = previous_hints.get(custom_id)
         else:
             continue
-        plan.append({"custom_id": cid, "class": cls, "model": chosen, "hint": hint})
+        plan.append(
+            {"custom_id": custom_id, "class": triage_class, "model": next_model, "hint": hint}
+        )
     return plan
 
 
