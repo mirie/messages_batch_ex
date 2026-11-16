@@ -1,13 +1,18 @@
-"""Extract 4 documents with the normal (synchronous) Messages API.
+"""Extract a few documents with the normal (synchronous) Messages API.
 
-Run:  uv run dry-run
+Run:  uv run dry-run                       (the default 4 documents)
+      uv run dry-run 24_degraded_scan      (only the documents you name)
+      MODEL=claude-sonnet-5-5 uv run dry-run 24_degraded_scan
 
 Same request shape the batch will use, but one call at a time, so you see
-each answer immediately. Includes the corrupt PDF so you can see what an
-invalid-request error looks like. Cost: a fraction of a cent on Haiku.
+each answer immediately. The default set includes the corrupt PDF so you can
+see what an invalid-request error looks like. Cost: under $0.001 per document
+on Haiku and about $0.02 on Sonnet (standard price, no batch discount).
 """
 
+import argparse
 import json
+import sys
 import time
 
 import anthropic
@@ -21,10 +26,28 @@ from invoice_batch.schema import parse_extraction
 DOCS = ["01_clean_classic", "19_unusual_format", "22_letter", "21_corrupt"]
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None) -> argparse.Namespace:
+    """Read the optional list of custom_ids from the command line."""
+    parser = argparse.ArgumentParser(
+        prog="dry-run", description="Extract documents one at a time with the Messages API."
+    )
+    parser.add_argument(
+        "custom_ids",
+        nargs="*",
+        default=DOCS,
+        help=f"documents to send (default: {' '.join(DOCS)})",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    custom_ids = parse_args(argv).custom_ids
+    missing = [custom_id for custom_id in custom_ids if not pdf_path_for(custom_id).exists()]
+    if missing:
+        sys.exit(f"No PDF for: {', '.join(missing)}. Run `uv run generate-invoices` first?")
     client = make_client()
     total = 0.0
-    for custom_id in DOCS:
+    for custom_id in custom_ids:
         print("=" * 72)
         print(f"{custom_id}   (model: {MODEL})")
         print("=" * 72)
