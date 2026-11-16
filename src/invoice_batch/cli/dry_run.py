@@ -11,9 +11,10 @@ import json
 import time
 
 import anthropic
+from pydantic import ValidationError
 
 from invoice_batch.config import MODEL, make_client, pdf_path_for
-from invoice_batch.pricing import cost_usd
+from invoice_batch.pricing import BATCH_DISCOUNT, cost_usd
 from invoice_batch.request_builder import build_params
 from invoice_batch.schema import parse_extraction
 
@@ -53,9 +54,14 @@ def main() -> None:
             elif block.type == "thinking":
                 print("thinking (summary):")
                 print(f"  {block.thinking.strip()}")
-        parsed = parse_extraction(msg.content)
-        print("parsed into InvoiceExtraction:")
-        print(json.dumps(parsed.model_dump(), indent=2, ensure_ascii=False))
+        try:
+            parsed = parse_extraction(msg.content)
+        except ValueError as e:  # no text block, or JSON that fails validation
+            kind = "validation" if isinstance(e, ValidationError) else "parse"
+            print(f"could not parse the reply ({kind}): {e}")
+        else:
+            print("parsed into InvoiceExtraction:")
+            print(json.dumps(parsed.model_dump(), indent=2, ensure_ascii=False))
         print(
             f"usage: input={usage['input_tokens']} output={usage['output_tokens']} "
             f"cache_write={usage.get('cache_creation_input_tokens')} "
@@ -64,7 +70,7 @@ def main() -> None:
         print(f"cost (standard price): ${cost:.5f}\n")
     print(
         f"Total dry-run cost at standard price: ${total:.5f} "
-        f"(a batch would be half: ${total / 2:.5f})"
+        f"(at batch price: ${total * BATCH_DISCOUNT:.5f})"
     )
 
 

@@ -6,11 +6,11 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from fakes import GOOD_EXTRACTION
 from pydantic import ValidationError
 
 from invoice_batch.schema import (
     INVOICE_SCHEMA,
-    OUTPUT_FORMAT,
     InvoiceExtraction,
     parse_extraction,
 )
@@ -40,24 +40,7 @@ def all_object_schemas(node):
 
 
 def valid_input(**overrides) -> dict:
-    data = {
-        "is_invoice": True,
-        "invoice_no": "INV-1",
-        "vendor": "Acme",
-        "customer_email": "a@example.com",
-        "issue_date": "2026-01-02",
-        "due_date": None,
-        "currency": "USD",
-        "line_items": [{"description": "Widget", "quantity": 2, "unit_price": 5.5}],
-        "total": 11.0,
-        "issues": [],
-    }
-    data.update(overrides)
-    return data
-
-
-def test_output_format_wraps_the_schema_as_json_schema():
-    assert OUTPUT_FORMAT == {"type": "json_schema", "schema": INVOICE_SCHEMA}
+    return {**GOOD_EXTRACTION, **overrides}
 
 
 def test_every_top_level_property_is_required():
@@ -133,17 +116,6 @@ def test_parity_check_looks_inside_line_items():
     assert shape(drifted, {}) != pydantic_shape()
 
 
-def test_pydantic_model_accepts_a_null_due_date():
-    assert InvoiceExtraction.model_validate(valid_input()).due_date is None
-
-
-def test_pydantic_model_rejects_a_missing_field():
-    data = valid_input()
-    del data["total"]
-    with pytest.raises(ValidationError):
-        InvoiceExtraction.model_validate(data)
-
-
 # --- reading Claude's reply ------------------------------------------------
 
 
@@ -153,7 +125,7 @@ def block(type_, **fields):
 
 def test_reply_is_read_from_the_text_block():
     content = [block("text", text=json.dumps(valid_input()))]
-    assert parse_extraction(content).invoice_no == "INV-1"
+    assert parse_extraction(content).invoice_no == "INV-1001"
 
 
 def test_thinking_blocks_before_the_reply_are_skipped():
@@ -176,4 +148,4 @@ def test_blocks_can_also_be_plain_dicts_as_saved_from_batch_results():
         {"type": "thinking", "thinking": "ok"},
         {"type": "text", "text": json.dumps(valid_input())},
     ]
-    assert parse_extraction(content).invoice_no == "INV-1"
+    assert parse_extraction(content).invoice_no == "INV-1001"

@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+import anthropic
 from dotenv import load_dotenv
 
 # src/invoice_batch/config.py -> project root is two levels above the package
@@ -38,8 +39,6 @@ def require_api_key() -> None:
 def make_client():
     """An Anthropic client, after checking the key is configured."""
     require_api_key()
-    import anthropic
-
     return anthropic.Anthropic()
 
 

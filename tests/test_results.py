@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from fakes import GOOD_EXTRACTION as GOOD
 from fakes import HAIKU, bare_result, errored_result, succeeded_result
 
 from invoice_batch.pricing import cost_usd
@@ -13,19 +14,6 @@ from invoice_batch.results import (
     total_cost,
     write_results_jsonl,
 )
-
-GOOD = {
-    "is_invoice": True,
-    "invoice_no": "INV-1001",
-    "vendor": "Acme",
-    "customer_email": "a@b.test",
-    "issue_date": "2026-01-02",
-    "due_date": None,
-    "currency": "USD",
-    "line_items": [{"description": "Widget", "quantity": 2, "unit_price": 5.0}],
-    "total": 10.0,
-    "issues": [],
-}
 
 
 def text(obj) -> dict:
@@ -83,28 +71,19 @@ def test_json_that_fails_validation_fails_the_check():
     assert "total" in rec["parse_problem"]
 
 
-@pytest.mark.parametrize("model", ["claude-unpriced-9", None])
-def test_an_unpriced_or_missing_model_records_no_cost_instead_of_crashing(model):
+@pytest.mark.parametrize(
+    "model, problem", [("claude-unpriced-9", "No price for model"), (None, "has no model")]
+)
+def test_an_unpriced_or_missing_model_records_no_cost_instead_of_crashing(model, problem):
     rec = record_from_result(succeeded_result("01_a", [text(GOOD)], model=model))
     assert rec["cost_usd"] is None
-    assert "price" in rec["cost_problem"] or "model" in rec["cost_problem"]
+    assert problem in rec["cost_problem"]
     assert rec["parse_ok"] is True  # the extraction is still kept
 
 
 def test_a_priced_result_has_no_cost_problem():
     rec = record_from_result(succeeded_result("01_a", [text(GOOD)]))
     assert rec["cost_problem"] is None
-
-
-def test_total_cost_skips_results_with_no_known_cost():
-    records, *_ = collect(
-        [
-            succeeded_result("01_a", [text(GOOD)]),
-            succeeded_result("02_b", [text(GOOD)], model="claude-unpriced-9"),
-        ],
-        expected_ids=["01_a", "02_b"],
-    )
-    assert total_cost(records) == pytest.approx(records[0]["cost_usd"])
 
 
 # --- errored / canceled / expired ----------------------------------------------------
@@ -159,10 +138,16 @@ def test_collect_warns_about_duplicate_unexpected_and_id_less_results():
     assert "no custom_id" in text_
 
 
-def test_total_cost_adds_up_only_billed_results():
+@pytest.mark.parametrize(
+    "other",
+    [
+        errored_result("02_b"),  # not billed: cost 0
+        succeeded_result("02_b", [text(GOOD)], model="claude-unpriced-9"),  # cost unknown
+    ],
+)
+def test_total_cost_adds_up_only_known_billed_costs(other):
     records, *_ = collect(
-        [succeeded_result("01_a", [text(GOOD)]), errored_result("02_b")],
-        expected_ids=["01_a", "02_b"],
+        [succeeded_result("01_a", [text(GOOD)]), other], expected_ids=["01_a", "02_b"]
     )
     assert total_cost(records) == pytest.approx(records[0]["cost_usd"])
 

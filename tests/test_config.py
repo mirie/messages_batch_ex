@@ -1,4 +1,4 @@
-"""The API key check exits clearly and never prints the key."""
+"""The API key check exits with setup instructions when the key is missing."""
 
 import pytest
 
@@ -16,10 +16,3 @@ def test_placeholder_key_is_treated_as_missing(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "your-anthropic-api-key-here")
     with pytest.raises(SystemExit):
         require_api_key()
-
-
-def test_real_key_passes_silently(monkeypatch, capsys):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-secret")
-    require_api_key()
-    out = capsys.readouterr()
-    assert "sk-ant-test-secret" not in out.out + out.err

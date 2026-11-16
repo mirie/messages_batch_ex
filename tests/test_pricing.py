@@ -1,11 +1,11 @@
 """Cost estimates: batch is half price, and cache tokens have their own rates."""
 
 import pytest
+from fakes import HAIKU
 
 from invoice_batch.pricing import cost_usd
 
 M = 1_000_000
-HAIKU = "claude-haiku-5-5"
 
 
 def test_batch_input_tokens_cost_half_the_standard_rate():

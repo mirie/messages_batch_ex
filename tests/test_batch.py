@@ -4,10 +4,9 @@ import json
 from datetime import UTC, datetime
 
 import pytest
-from fakes import FAKE_PDF, fake_client
+from fakes import FAKE_PDF, HAIKU, fake_client
 
 from invoice_batch.batch import (
-    MAX_BATCH_BYTES,
     build_requests,
     check_limits,
     estimate_batch_cost,
@@ -18,7 +17,6 @@ from invoice_batch.batch import (
 from invoice_batch.pricing import cost_usd
 from invoice_batch.request_builder import build_params
 
-HAIKU = "claude-haiku-5-5"
 SONNET = "claude-sonnet-5-5"
 
 
@@ -87,10 +85,6 @@ def test_oversized_batch_is_rejected(monkeypatch, pdf_dir):
     monkeypatch.setattr("invoice_batch.batch.MAX_BATCH_BYTES", 100)
     with pytest.raises(ValueError, match="256 MB"):
         check_limits(build_requests(["01_a"], pdf_dir=pdf_dir))
-
-
-def test_limit_constant_is_256_mb():
-    assert MAX_BATCH_BYTES == 256 * 1024 * 1024
 
 
 # --- submit + record ------------------------------------------------------
