@@ -118,7 +118,7 @@ class FakeClock:
         self.current += timedelta(seconds=seconds)
 
 
-# --- Batch results (stage 6) ------------------------------------------------------
+# --- Batch results ------------------------------------------------------
 # Each helper returns the dict that SDK_result.model_dump(mode="json") would give.
 
 HAIKU = "claude-haiku-5-5"

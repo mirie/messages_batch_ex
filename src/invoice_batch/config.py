@@ -11,7 +11,7 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 
-# src/invoice_batch/config.py -> project root is two levels above the package
+# parents: [0] invoice_batch/, [1] src/, [2] the project root
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
 INVOICES_DIR = DATA_DIR / "invoices"

@@ -1,4 +1,4 @@
-"""Stage 7 report: compare triage with ground truth and with my predictions.
+"""Compare triage with ground truth and with my predictions.
 
 This is for learning only. The pipeline itself never reads ground truth (a
 real pipeline has no answer key), so nothing here changes a triage class.

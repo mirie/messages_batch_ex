@@ -1,4 +1,4 @@
-"""Stage 5: ask the API how a batch is doing.
+"""Ask the API how a batch is doing.
 
 batches.retrieve() is free and idempotent, so it is safe to call as often as
 you like. Two things worth knowing from the docs:

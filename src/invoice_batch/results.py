@@ -1,4 +1,4 @@
-"""Stage 6: turn raw batch results into one flat record per document.
+"""Turn raw batch results into one flat record per document.
 
 Each result line from the API looks like:
 
@@ -16,7 +16,7 @@ everything here works on plain dicts (and missing keys just become None).
 Only "succeeded" results are billed. A succeeded result can still fail our
 check: a refusal or max_tokens stop breaks the JSON-outputs guarantee, and the
 text might not validate. That is recorded as parse_ok False + parse_problem;
-deciding what to do about it is stage 7 (triage).
+deciding what to do about it is triage's job.
 
 A model with no entry in PRICES gives cost_usd None + cost_problem instead of
 an exception, so one unpriced result never stops results.jsonl being written.

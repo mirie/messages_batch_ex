@@ -1,4 +1,4 @@
-"""Stage 7: apply the failure policy, putting every document in exactly one class.
+"""Apply the failure policy, putting every document in exactly one class.
 
     result missing / expired / canceled / errored (not invalid_request) -> RETRY_SAME
     errored with invalid_request_error                                -> NO_RETRY
@@ -17,7 +17,7 @@ in the triage command can catch it.
 
 `history` is the list of earlier results.jsonl records for one document,
 oldest first. On round 1 it is empty, so STABLE_ANSWER, MAX_ATTEMPTS and
-RETRY_ESCALATE can't happen yet; stages 8-9 pass real history in.
+RETRY_ESCALATE can't happen yet; retry-batch and run-pipeline pass real history in.
 """
 
 import re
@@ -44,7 +44,7 @@ RETRY_CLASSES = (RETRY_SAME, RETRY_WITH_HINT, RETRY_ESCALATE)
 REVIEW_CLASSES = (NO_RETRY, STABLE_ANSWER, MAX_ATTEMPTS)
 
 ATTEMPT_LIMIT = 3
-SUM_TOLERANCE = 0.01  # one cent
+SUM_TOLERANCE = 0.01
 REQUIRED_FIELDS = ("invoice_no", "vendor", "customer_email", "issue_date", "currency", "total")
 DATE_FIELDS = ("issue_date", "due_date")  # due_date may be null, but not malformed
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -159,7 +159,7 @@ def triage_run(
     """One decision per batch.json custom_id, in that order.
 
     A custom_id with no record is triaged like expired; a record whose id
-    isn't in custom_ids is ignored (see "Stage 7 input rules" in SPEC.md).
+    isn't in custom_ids is ignored (see "Triage input rules" in SPEC.md).
     """
     by_id = {r["custom_id"]: r for r in records}
     histories = histories or {}

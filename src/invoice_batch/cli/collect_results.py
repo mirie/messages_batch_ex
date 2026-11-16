@@ -1,4 +1,4 @@
-"""Stage 6: download a finished batch's results and save one record per document.
+"""Download a finished batch's results and save one record per document.
 
 Run:  uv run collect-results                       newest run in runs/
       uv run collect-results 20261116-011243       a specific run folder (or runs/...)

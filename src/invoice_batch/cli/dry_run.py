@@ -1,4 +1,4 @@
-"""Stage 3: extract 4 documents with the normal (synchronous) Messages API.
+"""Extract 4 documents with the normal (synchronous) Messages API.
 
 Run:  uv run dry-run
 

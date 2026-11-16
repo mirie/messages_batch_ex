@@ -1,1 +1,1 @@
-"""Thin command-line entry points, one per stage (see [project.scripts])."""
+"""Thin command-line entry points, one per command (see [project.scripts])."""

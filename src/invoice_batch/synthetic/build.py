@@ -148,7 +148,7 @@ def generate(out_dir: Path, seed: int = 42) -> list[dict]:
     printed = round(inv20["total"] + 100.00, 2)
     save("20_total_mismatch", lambda c: layout_compact(c, inv20, total_override=printed))
     t = truth_of(inv20)
-    t["total"] = printed  # the document really says this
+    t["total"] = printed  # truth is what the page prints, even though it is wrong
     add(
         "20_total_mismatch",
         "source_error",

@@ -1,4 +1,4 @@
-"""Stage 2: print the invoice JSON schema that every request sends.
+"""Print the invoice JSON schema that every request sends.
 
 Run:  uv run show-schema     (no API call, no key needed)
 """

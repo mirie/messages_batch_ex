@@ -1,4 +1,4 @@
-"""Stage 7: put every document of a collected batch in exactly one failure-policy class.
+"""Put every document of a collected batch in exactly one failure-policy class.
 
 Run:  uv run triage                       newest run in runs/
       uv run triage 20261116-011243       a specific run folder (or runs/...)

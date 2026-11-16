@@ -1,4 +1,4 @@
-"""Stage 4: turn PDFs into one Message Batch and record what was submitted.
+"""Turn PDFs into one Message Batch and record what was submitted.
 
 A batch is just a list of {"custom_id", "params"} pairs, where params is
 exactly the body you would send to messages.create(). The API answers each
@@ -18,9 +18,9 @@ from invoice_batch.runs import BATCH_RECORD, iso, write_json_atomic
 
 CUSTOM_ID_RE = re.compile(r"[a-zA-Z0-9_-]{1,64}")
 MAX_REQUESTS = 100_000
-MAX_BATCH_BYTES = 256 * 1024 * 1024  # 256 MB
+MAX_BATCH_BYTES = 256 * 1024 * 1024
 
-# Measured in the stage 3 dry run on Haiku 5.5 (per document), and confirmed by
+# Measured in the dry run on Haiku 5.5 (per document), and confirmed by
 # the first real batch (runs/20261116-011243): input ~1,800, output 300-500,
 # prefix 1,608.
 DRY_RUN_INPUT_TOKENS = 2000  # uncached part: the PDF + the user text

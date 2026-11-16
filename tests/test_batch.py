@@ -1,4 +1,4 @@
-"""Stage 4: building, sizing, submitting and recording a batch (no API calls)."""
+"""Building, sizing, submitting and recording a batch (no API calls)."""
 
 import json
 from datetime import UTC, datetime

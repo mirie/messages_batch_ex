@@ -9,7 +9,7 @@ from pathlib import Path
 from invoice_batch.config import MODEL
 from invoice_batch.schema import OUTPUT_FORMAT
 
-MAX_TOKENS = 16000  # generous: Haiku/Sonnet 5.5 think by default, and thinking counts
+MAX_TOKENS = 16000  # generous, because thinking tokens count toward max_tokens
 
 SYSTEM_PROMPT = """\
 You are an accounts-payable data extraction assistant. You receive exactly one

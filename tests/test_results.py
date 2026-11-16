@@ -1,4 +1,4 @@
-"""Stage 6: turning raw batch results into one record per document."""
+"""Turning raw batch results into one record per document."""
 
 import json
 

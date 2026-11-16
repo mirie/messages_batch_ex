@@ -1,4 +1,4 @@
-"""Stage 4: submit every PDF in data/invoices/ as ONE Message Batch.
+"""Submit every PDF in data/invoices/ as ONE Message Batch.
 
 Run:  uv run submit-batch          show the plan and the cost estimate (free)
       uv run submit-batch --yes    actually submit (costs money)

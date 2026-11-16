@@ -1,4 +1,4 @@
-"""Stage 5: describing a batch's status, polling it, and saving it to batch.json."""
+"""Describing a batch's status, polling it, and saving it to batch.json."""
 
 import json
 from datetime import timedelta
