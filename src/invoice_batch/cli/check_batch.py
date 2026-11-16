@@ -12,7 +12,7 @@ import time
 from datetime import UTC, datetime
 
 from invoice_batch.config import RUNS_DIR, make_client
-from invoice_batch.status import describe, resolve_batch, watch
+from invoice_batch.status import describe, resolve_batch, update_batch_record, watch
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -37,7 +37,10 @@ def main(argv: list[str] | None = None) -> None:
     else:
         batch = client.messages.batches.retrieve(batch_id)
 
-    print(describe(batch, now=datetime.now(UTC)))
+    now = datetime.now(UTC)
+    if run_dir is not None:
+        update_batch_record(run_dir, batch, checked_at=now)
+    print(describe(batch, now=now))
 
     if batch.processing_status == "ended":
         print("\nDone. Next: uv run collect-results")

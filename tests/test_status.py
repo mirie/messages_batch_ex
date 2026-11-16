@@ -117,3 +117,43 @@ def test_watch_polls_until_ended_and_prints_one_line_per_poll():
     assert lines[0].startswith("[01:12:44]")
     assert lines[1].startswith("[01:13:44]")
     assert "ended" in lines[2]
+
+
+# --- update_batch_record: keep batch.json in step with the API --------------------
+
+
+def test_update_batch_record_writes_the_latest_status_and_keeps_everything_else(tmp_path):
+    from invoice_batch.status import update_batch_record
+
+    run = tmp_path / "run"
+    run.mkdir()
+    original = {
+        "batch_id": "msgbatch_x",
+        "custom_ids": ["01_a"],
+        "processing_status": "in_progress",
+    }
+    (run / "batch.json").write_text(json.dumps(original))
+    ended = CREATED + timedelta(minutes=5, seconds=15)
+    batch = batch_status("ended", succeeded=1, created_at=CREATED, ended_at=ended)
+
+    update_batch_record(run, batch, checked_at=ended)
+
+    saved = json.loads((run / "batch.json").read_text())
+    assert saved["batch_id"] == "msgbatch_x"
+    assert saved["custom_ids"] == ["01_a"]
+    assert saved["processing_status"] == "ended"
+    assert saved["request_counts"]["succeeded"] == 1
+    assert saved["ended_at"] == ended.isoformat()
+    assert saved["last_checked_at"] == ended.isoformat()
+
+
+def test_update_batch_record_leaves_ended_at_null_while_running(tmp_path):
+    from invoice_batch.status import update_batch_record
+
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "batch.json").write_text(json.dumps({"batch_id": "msgbatch_x"}))
+    update_batch_record(run, batch_status("in_progress", processing=1, created_at=CREATED), CREATED)
+    saved = json.loads((run / "batch.json").read_text())
+    assert saved["processing_status"] == "in_progress"
+    assert saved["ended_at"] is None

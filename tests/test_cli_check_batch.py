@@ -51,3 +51,14 @@ def test_watch_polls_until_ended(runs, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert client.messages.batches.retrieved == ["msgbatch_real"] * 2
     assert "collect-results" in out  # next step once it has ended
+
+
+def test_check_writes_the_latest_status_back_into_batch_json(runs, monkeypatch):
+    _use_client(
+        monkeypatch,
+        [batch_status("ended", succeeded=23, created_at=CREATED, ended_at=CREATED)],
+    )
+    check_batch.main([])
+    saved = json.loads((runs / "runs" / "20261116-011243" / "batch.json").read_text())
+    assert saved["processing_status"] == "ended"
+    assert saved["batch_id"] == "msgbatch_real"

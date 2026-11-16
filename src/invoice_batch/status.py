@@ -54,6 +54,21 @@ def elapsed_text(delta: timedelta) -> str:
     return f"{minutes}m {seconds:02d}s"
 
 
+def update_batch_record(run_dir: Path, batch, checked_at: datetime) -> None:
+    """Write the latest status into batch.json so the file never goes stale.
+
+    batch.json starts as a snapshot from submit time; everything else in it
+    (ids, models, submit time) is kept as-is.
+    """
+    path = run_dir / "batch.json"
+    record = json.loads(path.read_text())
+    record["processing_status"] = batch.processing_status
+    record["request_counts"] = {name: getattr(batch.request_counts, name) for name in COUNT_FIELDS}
+    record["ended_at"] = batch.ended_at.isoformat() if batch.ended_at else None
+    record["last_checked_at"] = checked_at.isoformat()
+    path.write_text(json.dumps(record, indent=2) + "\n")
+
+
 def utc_text(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
