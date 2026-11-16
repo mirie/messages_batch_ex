@@ -53,7 +53,7 @@ class InvoiceExtraction(BaseModel):
 
 
 def api_schema(model: type[BaseModel]) -> dict:
-    """model_json_schema() rewritten in the plain style the API docs use.
+    """Convert model_json_schema() output to the plain style the API docs use.
 
     Only the spelling changes, never the meaning: nested models are inlined
     instead of "$ref" links, `anyOf: [X, null]` becomes `type: [X, "null"]`,

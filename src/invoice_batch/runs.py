@@ -72,7 +72,10 @@ def load_batch_record(run_dir: Path) -> dict:
 
 
 def _batch_id_or_none(record: Path) -> str | None:
-    """While searching for an id, one broken batch.json must not hide the rest."""
+    """Return the batch id in this batch.json, or None if the file can't be read.
+
+    Used while searching every run, so one broken file doesn't stop the search.
+    """
     try:
         return json.loads(record.read_text()).get("batch_id")
     except (OSError, json.JSONDecodeError, AttributeError):
@@ -96,12 +99,11 @@ def write_json_atomic(path: Path, data) -> None:
 
 
 def iso(value) -> str | None:
-    """A datetime as ISO 8601 text for a JSON file; None (or a string) unchanged."""
     return value.isoformat() if isinstance(value, datetime) else value
 
 
 def display_path(path: Path, base: Path) -> str:
-    """path relative to base when it is inside it, else the full path."""
+    """Return path relative to base for printing, or the full path if it's outside base."""
     try:
         return str(path.resolve().relative_to(base.resolve()))
     except ValueError:

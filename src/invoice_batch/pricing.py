@@ -10,7 +10,7 @@ BATCH_DISCOUNT = 0.5  # Batch API: 50% off every token type, stacks with caching
 
 
 def cost_usd(usage: dict, model: str, batch: bool = True) -> float:
-    """Cost of one response, from its usage dict."""
+    """Dollar cost of one response from its usage dict, at batch price unless batch=False."""
     p = PRICES.get(model)
     if p is None:
         raise ValueError(f"No price for model {model!r}; add it to PRICES in pricing.py")

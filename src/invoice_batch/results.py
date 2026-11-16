@@ -100,7 +100,7 @@ def _cost(usage: dict, model: str | None) -> tuple[float | None, str | None]:
 
 
 def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str], list[str]]:
-    """Records sorted by custom_id, expected ids with no result, and warnings.
+    """Return (records sorted by custom_id, expected ids that got no result, warnings).
 
     The API promises one result per custom_id, so duplicates, ids that
     batch.json doesn't list, and results with no id should never happen.
@@ -125,7 +125,6 @@ def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str], list[
 
 
 def total_cost(records: list[dict]) -> float:
-    """Sum of known costs; results with cost_usd None are left out."""
     return sum(r["cost_usd"] for r in records if r["cost_usd"] is not None)
 
 

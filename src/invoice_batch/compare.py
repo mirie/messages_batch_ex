@@ -39,10 +39,11 @@ def _same_number(got, truth) -> bool:
 
 
 def truth_diffs(extraction: dict | None, truth: dict | None) -> list[str] | None:
-    """Fields that differ from ground truth, or None if there was no extraction.
+    """Return the fields that differ from ground truth, or None if there is no
+    extraction to compare.
 
-    truth None means the document is not an invoice (letter, blank page), so
-    the only thing to check is is_invoice.
+    Non-invoices (the letter, the blank page) have no truth values, so for
+    them only is_invoice is checked.
     """
     if extraction is None:
         return None

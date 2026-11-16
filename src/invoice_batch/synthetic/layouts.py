@@ -182,8 +182,10 @@ def layout_compact(c, inv, *, show_due=True, total_override=None):
 
 
 def layout_cluttered(c, inv, rng):
-    """Busy layout: a security pattern of decoy digits sits behind (and in the
-    text layer alongside) small, tightly packed numbers."""
+    """Busy layout: small, tightly packed numbers on a background of decoy digits.
+
+    The decoys are in the PDF's text layer too, not just in the image.
+    """
     cur = inv["currency"]
     # 1) decoy digit pattern across the whole page (drawn first, so it is also
     #    the first thing in the PDF's extracted text)

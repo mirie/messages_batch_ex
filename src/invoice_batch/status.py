@@ -62,7 +62,6 @@ def counts_text(batch) -> str:
 
 
 def describe(batch, now: datetime) -> str:
-    """A few readable lines about one retrieved batch."""
     lines = [
         f"processing_status: {batch.processing_status}",
         f"request_counts:    {counts_text(batch)}",

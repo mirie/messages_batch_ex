@@ -51,7 +51,8 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def check_extraction(ex: dict) -> list[str]:
-    """Problems with a parsed invoice, each phrased so it can become a hint."""
+    """Return what's wrong with a parsed invoice, one sentence per problem, worded
+    so a retry can use it as the hint."""
     problems = [f"required field {f} is missing" for f in REQUIRED_FIELDS if ex.get(f) is None]
 
     for field in DATE_FIELDS:
@@ -85,7 +86,7 @@ def _is_empty(ex: dict) -> bool:
 
 
 def same_values(a: dict | None, b: dict | None) -> bool:
-    """Two extractions agree on every field except the free-text issues list."""
+    """True if two extractions match on every field except the free-text issues list."""
     if a is None or b is None:
         return False
     strip = lambda ex: {k: v for k, v in ex.items() if k != "issues"}  # noqa: E731
@@ -97,7 +98,7 @@ def _decision(cls: str, reason: str, attempt: int, problems: list[str] | None = 
 
 
 def triage_one(record: dict | None, history: list[dict] = ()) -> dict:
-    """{class, reason, problems, attempt} for one document's latest result."""
+    """Classify one document's latest result. Returns {class, reason, problems, attempt}."""
     attempt = len(history) + 1
     out_of_attempts = attempt >= ATTEMPT_LIMIT
 

@@ -37,7 +37,6 @@ def require_api_key() -> None:
 
 
 def make_client():
-    """An Anthropic client, after checking the key is configured."""
     require_api_key()
     return anthropic.Anthropic()
 

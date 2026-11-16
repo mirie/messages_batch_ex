@@ -1,4 +1,4 @@
-"""Stage 5: check how a submitted batch is doing (free: retrieving costs nothing).
+"""Stage 5: check how a submitted batch is doing. Free.
 
 Run:  uv run check-batch                      newest run in runs/
       uv run check-batch 20261116-011243      a specific run folder (or runs/...)

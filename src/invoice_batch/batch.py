@@ -34,7 +34,8 @@ def build_requests(
     hints: dict[str, str] | None = None,
     pdf_dir: Path = INVOICES_DIR,
 ) -> list[dict]:
-    """One batch request per document. Hints (for retries) are per custom_id."""
+    """Build one request per document. `hints` maps a custom_id to its retry hint;
+    other documents get the plain prompt."""
     hints = hints or {}
     seen: set[str] = set()
     requests = []
@@ -65,15 +66,16 @@ def check_limits(requests: list[dict]) -> None:
 
 
 def submit(client, requests: list[dict]):
-    """Send the batch. Returns immediately; processing happens later."""
+    """Returns as soon as the batch is queued; the requests are processed later."""
     return client.messages.batches.create(requests=requests)
 
 
 def write_batch_record(run_dir: Path, batch, requests: list[dict], submitted_at: datetime) -> Path:
-    """Save what check/collect need later: the id, the times, and who was in it.
+    """Save what check-batch and collect-results need: the batch id, the times,
+    and each document's id and model.
 
-    Deliberately leaves out the request bodies (the base64 PDFs are big and
-    can be rebuilt from data/).
+    The request bodies are left out: the base64 PDFs are large and can be
+    rebuilt from data/.
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     record = {
@@ -97,12 +99,12 @@ def estimate_batch_cost(
     output_tokens: int = DRY_RUN_OUTPUT_TOKENS,
     prefix_tokens: int = DRY_RUN_PREFIX_TOKENS,
 ) -> dict[str, float]:
-    """Batch-price estimate for n similar requests.
+    """Estimate the batch-price cost of n similar requests.
 
-    typical: the first request writes the shared prefix to the cache, the rest
-             read it.
-    worst:   every request misses the cache and writes it (cache hits inside a
-             batch are best-effort, so this can really happen).
+    typical: the first request writes the shared prefix to the cache and the
+             rest read it.
+    worst:   every request misses the cache. Cache hits inside a batch are
+             best-effort, so this can really happen.
     """
     base = {"input_tokens": input_tokens, "output_tokens": output_tokens}
     write = cost_usd({**base, "cache_creation_input_tokens": prefix_tokens}, model, batch=True)
@@ -116,11 +118,11 @@ def estimate_batch_cost(
 def estimate_worst_rounds(
     n_requests: int, model: str, escalation_model: str, rounds: int = 3
 ) -> float:
-    """Ceiling for a full retry run: every document fails every round.
+    """Upper bound for a full retry run, assuming every document fails every round.
 
-    Rounds 1..rounds-1 run on model (the first plain, the next with a hint);
-    the last round runs on escalation_model. Each round uses the cache-miss
-    "worst" figure, so nothing here relies on cache hits.
+    All rounds except the last run on `model` (the first plain, the next with
+    a hint); the last runs on `escalation_model`. Every round uses the
+    cache-miss cost, so the bound doesn't depend on cache hits.
     """
     normal = estimate_batch_cost(n_requests, model)["worst"]
     escalated = estimate_batch_cost(n_requests, escalation_model)["worst"]
