@@ -1,4 +1,4 @@
-"""The extract_invoice tool, the data extracted from invoice PDF files.
+"""The extract_invoice tool, extracts data from invoice PDF files.
 
 Nullable fields ("type": ["string", "null"]) let Claude say "not on the page"
 instead of inventing a value. strict: true makes the API guarantee the tool

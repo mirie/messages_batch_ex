@@ -16,6 +16,7 @@ dependencies = [
 generate-invoices = "invoice_batch.cli.generate_invoices:main"
 show-schema = "invoice_batch.cli.show_schema:main"
 dry-run = "invoice_batch.cli.dry_run:main"
+submit-batch = "invoice_batch.cli.submit_batch:main"
 
 [dependency-groups]
 dev = [
@@ -32,6 +33,7 @@ module-name = "invoice_batch"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = "-ra"
 
 [tool.ruff]
