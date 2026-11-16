@@ -1,17 +1,16 @@
-"""The invoice JSON schema must satisfy the structured-outputs rules, and the
-Pydantic model must mirror it so our code can validate what comes back."""
+"""The API schema is generated from the Pydantic model and must satisfy the
+structured-outputs rules; parse_extraction() reads Claude's reply."""
 
-import copy
 import json
 from types import SimpleNamespace
 
 import pytest
 from fakes import GOOD_EXTRACTION
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from invoice_batch.schema import (
     INVOICE_SCHEMA,
-    InvoiceExtraction,
+    api_schema,
     parse_extraction,
 )
 
@@ -27,20 +26,59 @@ NULLABLE_FIELDS = [
 ]
 
 
-def all_object_schemas(node):
-    """Yield every {"type": "object"} schema, including nested ones."""
+def all_nodes(node):
+    """Yield every dict in a JSON schema, including nested ones."""
     if isinstance(node, dict):
-        if node.get("type") == "object":
-            yield node
+        yield node
         for value in node.values():
-            yield from all_object_schemas(value)
+            yield from all_nodes(value)
     elif isinstance(node, list):
         for value in node:
-            yield from all_object_schemas(value)
+            yield from all_nodes(value)
+
+
+def all_object_schemas(node):
+    return [n for n in all_nodes(node) if n.get("type") == "object"]
 
 
 def valid_input(**overrides) -> dict:
     return {**GOOD_EXTRACTION, **overrides}
+
+
+# --- api_schema(): Pydantic's spelling -> the spelling we send ---------------
+
+
+class Part(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+
+
+class Toy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    note: str | None = Field(description="Maybe a note.")
+    parts: list[Part]
+
+
+def test_api_schema_writes_nullable_as_a_type_list_and_keeps_the_description():
+    assert api_schema(Toy)["properties"]["note"] == {
+        "type": ["string", "null"],
+        "description": "Maybe a note.",
+    }
+
+
+def test_api_schema_inlines_nested_models_and_drops_titles_and_defs():
+    schema = api_schema(Toy)
+    assert schema["properties"]["parts"]["items"] == {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "required": ["name"],
+        "additionalProperties": False,
+    }
+    text = json.dumps(schema)
+    assert "$ref" not in text and "$defs" not in text and '"title"' not in text
+
+
+# --- the structured-outputs rules, checked on the generated schema -----------
 
 
 def test_every_top_level_property_is_required():
@@ -48,9 +86,10 @@ def test_every_top_level_property_is_required():
 
 
 def test_every_object_forbids_additional_properties():
-    objects = list(all_object_schemas(SCHEMA))
+    objects = all_object_schemas(SCHEMA)
     assert len(objects) == 2  # the invoice and a line item
     assert all(obj["additionalProperties"] is False for obj in objects)
+    assert all(set(obj["required"]) == set(obj["properties"]) for obj in objects)
 
 
 @pytest.mark.parametrize("field", NULLABLE_FIELDS)
@@ -58,62 +97,9 @@ def test_optional_fields_accept_null(field):
     assert "null" in SCHEMA["properties"][field]["type"]
 
 
-def shape(node: dict, defs: dict) -> dict:
-    """Boil a JSON schema down to what matters for parity: the allowed JSON
-    types, and for objects/arrays the shape of what's inside.
-
-    Ignores descriptions and titles, and treats the two spellings of
-    "nullable" as equal: {"type": ["string", "null"]} (our dict) and
-    {"anyOf": [{"type": "string"}, {"type": "null"}]} (what Pydantic emits).
-    It also follows Pydantic's {"$ref": "#/$defs/LineItem"} links.
-    """
-    if "$ref" in node:
-        node = defs[node["$ref"].split("/")[-1]]
-    if "anyOf" in node:
-        types: set[str] = set()
-        inner: dict = {}
-        for branch in node["anyOf"]:
-            branch_shape = shape(branch, defs)
-            types |= branch_shape.pop("types")
-            inner.update(branch_shape)
-        return {"types": types, **inner}
-    raw = node["type"]
-    result: dict = {"types": {raw} if isinstance(raw, str) else set(raw)}
-    if "properties" in node:
-        result["properties"] = {k: shape(v, defs) for k, v in node["properties"].items()}
-        result["required"] = set(node.get("required", []))
-    if "items" in node:
-        result["items"] = shape(node["items"], defs)
-    return result
-
-
-def pydantic_shape() -> dict:
-    schema = InvoiceExtraction.model_json_schema()
-    return shape(schema, schema.get("$defs", {}))
-
-
-def test_pydantic_model_matches_the_output_schema_field_by_field():
-    # Same field names, same JSON types, same nullability, same required
-    # fields, all the way down into line_items.
-    assert shape(SCHEMA, {}) == pydantic_shape()
-
-
-def test_parity_check_catches_a_changed_type():
-    drifted = copy.deepcopy(SCHEMA)
-    drifted["properties"]["total"]["type"] = ["string", "null"]  # Pydantic says float
-    assert shape(drifted, {}) != pydantic_shape()
-
-
-def test_parity_check_catches_a_dropped_null():
-    drifted = copy.deepcopy(SCHEMA)
-    drifted["properties"]["due_date"]["type"] = "string"  # Pydantic allows None
-    assert shape(drifted, {}) != pydantic_shape()
-
-
-def test_parity_check_looks_inside_line_items():
-    drifted = copy.deepcopy(SCHEMA)
-    drifted["properties"]["line_items"]["items"]["properties"]["quantity"]["type"] = "integer"
-    assert shape(drifted, {}) != pydantic_shape()
+def test_every_top_level_field_tells_claude_what_it_is():
+    missing = [k for k, v in SCHEMA["properties"].items() if not v.get("description")]
+    assert missing == []
 
 
 # --- reading Claude's reply ------------------------------------------------

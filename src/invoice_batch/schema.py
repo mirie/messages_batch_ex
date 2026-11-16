@@ -1,102 +1,95 @@
-"""The invoice schema (sent as output_config.format) and its Pydantic twin.
+"""The invoice model: one Pydantic definition, from which the API schema is generated.
 
-Structured outputs require every field to be listed in `required`, so a value
-that isn't on the page comes back as null rather than as a missing key. That
-also gives Claude a way out instead of inventing a value.
+Structured outputs require every field to be listed in `required`, so no field
+has a default: a value that isn't on the page comes back as null rather than as
+a missing key. That also gives Claude a way out instead of inventing a value.
+`extra="forbid"` produces the required `additionalProperties: false`.
 
 The API guarantees the reply matches the schema, except after a refusal or
-max_tokens stop. So replies are still validated with InvoiceExtraction, and
-tests keep the two definitions in sync.
+max_tokens stop. So replies are still validated with InvoiceExtraction.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
+
+_STRICT = ConfigDict(extra="forbid")
 
 
-def _nullable(type_: str, description: str) -> dict:
-    return {"type": [type_, "null"], "description": description}
-
-
-INVOICE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "is_invoice": {
-            "type": "boolean",
-            "description": "true only if the document is an invoice or bill requesting payment.",
-        },
-        "invoice_no": _nullable("string", "Invoice number exactly as printed."),
-        "vendor": _nullable("string", "Name of the business that issued the invoice."),
-        "customer_email": _nullable("string", "Email address of the customer being billed."),
-        "issue_date": _nullable("string", "Issue date as YYYY-MM-DD."),
-        "due_date": _nullable(
-            "string", "Payment due date as YYYY-MM-DD, or null if none is printed."
-        ),
-        "currency": _nullable(
-            "string", "ISO 4217 three-letter currency code, e.g. USD, EUR, GBP, CHF."
-        ),
-        "line_items": {
-            "type": "array",
-            "description": "One entry per billed line, in document order. Empty if none.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "description": {"type": "string"},
-                    "quantity": {"type": "number"},
-                    "unit_price": {
-                        "type": "number",
-                        "description": "Price per unit as a plain number.",
-                    },
-                },
-                "required": ["description", "quantity", "unit_price"],
-                "additionalProperties": False,
-            },
-        },
-        "total": _nullable("number", "The total amount due exactly as printed, as a plain number."),
-        "issues": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": (
-                "Short notes on anything unreadable, ambiguous or suspicious, e.g. "
-                "'printed total does not equal sum of line items'. Empty if none."
-            ),
-        },
-    },
-    "required": [
-        "is_invoice",
-        "invoice_no",
-        "vendor",
-        "customer_email",
-        "issue_date",
-        "due_date",
-        "currency",
-        "line_items",
-        "total",
-        "issues",
-    ],
-    "additionalProperties": False,
-}
-
-# What goes in the request:  "output_config": {"format": OUTPUT_FORMAT}
-OUTPUT_FORMAT = {"type": "json_schema", "schema": INVOICE_SCHEMA}
-
-
-# The same shape as a Pydantic model, so our code can validate what comes back.
 class LineItem(BaseModel):
+    model_config = _STRICT
+
     description: str
     quantity: float
-    unit_price: float
+    unit_price: float = Field(description="Price per unit as a plain number.")
 
 
 class InvoiceExtraction(BaseModel):
-    is_invoice: bool
-    invoice_no: str | None
-    vendor: str | None
-    customer_email: str | None
-    issue_date: str | None
-    due_date: str | None
-    currency: str | None
-    line_items: list[LineItem]
-    total: float | None
-    issues: list[str]
+    model_config = _STRICT
+
+    is_invoice: bool = Field(
+        description="true only if the document is an invoice or bill requesting payment."
+    )
+    invoice_no: str | None = Field(description="Invoice number exactly as printed.")
+    vendor: str | None = Field(description="Name of the business that issued the invoice.")
+    customer_email: str | None = Field(description="Email address of the customer being billed.")
+    issue_date: str | None = Field(description="Issue date as YYYY-MM-DD.")
+    due_date: str | None = Field(
+        description="Payment due date as YYYY-MM-DD, or null if none is printed."
+    )
+    currency: str | None = Field(
+        description="ISO 4217 three-letter currency code, e.g. USD, EUR, GBP, CHF."
+    )
+    line_items: list[LineItem] = Field(
+        description="One entry per billed line, in document order. Empty if none."
+    )
+    total: float | None = Field(
+        description="The total amount due exactly as printed, as a plain number."
+    )
+    issues: list[str] = Field(
+        description=(
+            "Short notes on anything unreadable, ambiguous or suspicious, e.g. "
+            "'printed total does not equal sum of line items'. Empty if none."
+        )
+    )
+
+
+def api_schema(model: type[BaseModel]) -> dict:
+    """model_json_schema() rewritten in the plain style the API docs use.
+
+    Only the spelling changes, never the meaning: nested models are inlined
+    instead of "$ref" links, `anyOf: [X, null]` becomes `type: [X, "null"]`,
+    and Pydantic's auto-generated titles are dropped.
+    """
+    raw = model.model_json_schema()
+    defs = raw.pop("$defs", {})
+
+    def clean(node):
+        if isinstance(node, list):
+            return [clean(n) for n in node]
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node:
+            return clean(defs[node["$ref"].split("/")[-1]])
+        node = {k: v for k, v in node.items() if k != "title"}
+        branches = node.get("anyOf", [])
+        if len(branches) == 2 and {"type": "null"} in branches:
+            (other,) = [b for b in branches if b != {"type": "null"}]
+            node = {"type": [other["type"], "null"], **_without(node, "anyOf")}
+        node = {"type": node["type"], **_without(node, "type")} if "type" in node else node
+        return {k: (v if k == "required" else clean(v)) for k, v in node.items()}
+
+    schema = clean(raw)
+    assert isinstance(schema, dict)
+    return schema
+
+
+def _without(d: dict, key: str) -> dict:
+    return {k: v for k, v in d.items() if k != key}
+
+
+INVOICE_SCHEMA = api_schema(InvoiceExtraction)
+
+# What goes in the request:  "output_config": {"format": OUTPUT_FORMAT}
+OUTPUT_FORMAT = {"type": "json_schema", "schema": INVOICE_SCHEMA}
 
 
 def parse_extraction(content: list) -> InvoiceExtraction:

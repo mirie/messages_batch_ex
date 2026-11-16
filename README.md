@@ -61,7 +61,7 @@ uv run ruff format .     # format
 uv run ruff check .      # lint
 ```
 
-The tests never call the API. They cover the invoice JSON schema (structured-output rules, and a field-by-field match with the Pydantic model), the request builder, batch building and submitting (with a fake client), pricing, the API key check, and the generated test set (counts, totals, reproducibility). New behavior is added test-first: write a failing test, then the code that makes it pass.
+The tests never call the API. They cover the invoice JSON schema (generated from the Pydantic model, checked against the structured-output rules), the request builder, batch building and submitting (with a fake client), pricing, the API key check, and the generated test set (counts, totals, reproducibility). New behavior is added test-first: write a failing test, then the code that makes it pass.
 
 ## How it works
 
@@ -95,7 +95,7 @@ sequenceDiagram
     Note over Code: json-parse the text block with parse_extraction() and you're done.
 ```
 
-`INVOICE_SCHEMA` (`schema.py`) describes the reply: nullable fields, `is_invoice`, and an `issues` list. Sending it as `output_config.format` makes the API guarantee that Claude's reply is JSON matching the schema (keys, types, no extras). Nullable fields (`["string", "null"]`) let Claude report "not printed" instead of inventing a value. Every model gets the same request, so the Haiku attempts and the Sonnet escalation look identical.
+`INVOICE_SCHEMA` (`schema.py`, generated from the `InvoiceExtraction` Pydantic model) describes the reply: nullable fields, `is_invoice`, and an `issues` list. Sending it as `output_config.format` makes the API guarantee that Claude's reply is JSON matching the schema (keys, types, no extras). Nullable fields (`["string", "null"]`) let Claude report "not printed" instead of inventing a value. Every model gets the same request, so the Haiku attempts and the Sonnet escalation look identical.
 
 ### Structured outputs: JSON outputs vs. strict tools
 
@@ -127,7 +127,7 @@ The code is a package in `src/invoice_batch/`. Library modules hold the logic an
 ```
 src/invoice_batch/
 ├── config.py            paths, MODEL / ESCALATION_MODEL, API key check, client
-├── schema.py            INVOICE_SCHEMA, OUTPUT_FORMAT, InvoiceExtraction, parse_extraction()
+├── schema.py            InvoiceExtraction (single source), api_schema(), OUTPUT_FORMAT, parse_extraction()
 ├── request_builder.py   system prompt, build_params()
 ├── batch.py             build_requests(), check_limits(), submit(), estimate_batch_cost()
 ├── pricing.py           PRICES, cost_usd() (standard vs. batch)
@@ -151,7 +151,7 @@ src/invoice_batch/
 tests/                   pytest, one file per library module
 ```
 
-- `schema.py`: `OUTPUT_FORMAT` is sent to the API; `parse_extraction()` reads the reply's text block into an `InvoiceExtraction`.
+- `schema.py`: the `InvoiceExtraction` Pydantic model is the only definition of the fields; `api_schema()` generates `INVOICE_SCHEMA` from it. `OUTPUT_FORMAT` is sent to the API; `parse_extraction()` reads the reply's text block into an `InvoiceExtraction`.
 - `request_builder.py`: `build_params()` returns the full request for one PDF. The dry run and the batch stages use the same function.
 - `synthetic/build.py`: `generate(out_dir, seed=42)` writes the PDFs and ground truth. It takes the output folder as an argument, so tests can write to a temporary folder.
 - `cli/dry_run.py`: sends 4 documents synchronously and prints the raw JSON text block, the parsed result, `stop_reason`, usage, and any error.
