@@ -169,3 +169,11 @@ def test_a_reply_without_a_text_block_is_an_error():
 def test_a_reply_that_does_not_match_the_model_is_an_error():
     with pytest.raises(ValidationError):
         parse_extraction([block("text", text='{"is_invoice": true}')])
+
+
+def test_blocks_can_also_be_plain_dicts_as_saved_from_batch_results():
+    content = [
+        {"type": "thinking", "thinking": "ok"},
+        {"type": "text", "text": json.dumps(valid_input())},
+    ]
+    assert parse_extraction(content).invoice_no == "INV-1"

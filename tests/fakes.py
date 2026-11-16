@@ -88,3 +88,81 @@ class FakeClock:
         from datetime import timedelta
 
         self.current += timedelta(seconds=seconds)
+
+
+# --- Batch results (stage 6) ------------------------------------------------------
+# Each helper returns the dict that SDK_result.model_dump(mode="json") would give.
+
+HAIKU = "claude-haiku-5-5"
+USAGE = {
+    "input_tokens": 2000,
+    "output_tokens": 400,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1612,
+}
+
+
+def succeeded_result(custom_id, content, stop_reason="end_turn", usage=None, model=HAIKU):
+    return {
+        "custom_id": custom_id,
+        "result": {
+            "type": "succeeded",
+            "message": {
+                "id": f"msg_{custom_id}",
+                "type": "message",
+                "role": "assistant",
+                "model": model,
+                "content": content,
+                "stop_reason": stop_reason,
+                "stop_details": None,
+                "usage": usage or dict(USAGE),
+            },
+        },
+    }
+
+
+def errored_result(custom_id, error_type="invalid_request_error", message="bad document"):
+    return {
+        "custom_id": custom_id,
+        "result": {
+            "type": "errored",
+            "error": {
+                "type": "error",
+                "error": {"type": error_type, "message": message},
+                "request_id": "req_x",
+            },
+        },
+    }
+
+
+def bare_result(custom_id, result_type):
+    """canceled / expired results carry nothing but their type."""
+    return {"custom_id": custom_id, "result": {"type": result_type}}
+
+
+class FakeSdkItem:
+    """Looks like an SDK result object: only model_dump() is used."""
+
+    def __init__(self, data):
+        self._data = data
+
+    def model_dump(self, mode="python"):
+        return self._data
+
+
+class FakeResultsBatches:
+    def __init__(self, items, status):
+        self._items = items
+        self._status = status
+        self.results_for = []
+
+    def results(self, batch_id):
+        self.results_for.append(batch_id)
+        return iter(FakeSdkItem(d) for d in self._items)
+
+    def retrieve(self, batch_id):
+        return self._status
+
+
+def fake_results_client(items, status):
+    return SimpleNamespace(messages=SimpleNamespace(batches=FakeResultsBatches(items, status)))

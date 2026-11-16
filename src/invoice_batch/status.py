@@ -54,7 +54,7 @@ def elapsed_text(delta: timedelta) -> str:
     return f"{minutes}m {seconds:02d}s"
 
 
-def _utc(value: datetime) -> str:
+def utc_text(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
@@ -68,11 +68,11 @@ def describe(batch, now: datetime) -> str:
     lines = [
         f"processing_status: {batch.processing_status}",
         f"request_counts:    {counts_text(batch)}",
-        f"created_at:        {_utc(batch.created_at)}",
-        f"now:               {_utc(now)}",
+        f"created_at:        {utc_text(batch.created_at)}",
+        f"now:               {utc_text(now)}",
     ]
     if batch.ended_at is not None:
-        lines.append(f"ended_at:          {_utc(batch.ended_at)}")
+        lines.append(f"ended_at:          {utc_text(batch.ended_at)}")
         lines.append(f"total wait:        {elapsed_text(batch.ended_at - batch.created_at)}")
         lines.append(f"results_url:       {batch.results_url}")
     else:

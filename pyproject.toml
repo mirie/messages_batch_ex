@@ -18,6 +18,7 @@ show-schema = "invoice_batch.cli.show_schema:main"
 dry-run = "invoice_batch.cli.dry_run:main"
 submit-batch = "invoice_batch.cli.submit_batch:main"
 check-batch = "invoice_batch.cli.check_batch:main"
+collect-results = "invoice_batch.cli.collect_results:main"
 
 [dependency-groups]
 dev = [

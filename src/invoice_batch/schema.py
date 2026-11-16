@@ -101,8 +101,13 @@ def parse_extraction(content: list) -> InvoiceExtraction:
 
     The content may start with thinking blocks (Haiku and Sonnet 5.5 think by
     default), so look for the text block rather than taking content[0].
+    Blocks may be SDK objects or plain dicts (as saved from batch results).
     """
-    text = next((b.text for b in content if b.type == "text"), None)
+    blocks = [
+        b if isinstance(b, dict) else {"type": b.type, "text": getattr(b, "text", None)}
+        for b in content
+    ]
+    text = next((b["text"] for b in blocks if b["type"] == "text"), None)
     if text is None:
-        raise ValueError(f"reply has no text block (got {[b.type for b in content]})")
+        raise ValueError(f"reply has no text block (got {[b['type'] for b in blocks]})")
     return InvoiceExtraction.model_validate_json(text)
