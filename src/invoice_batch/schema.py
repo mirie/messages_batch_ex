@@ -1,14 +1,18 @@
 """The invoice model: one Pydantic definition, from which the API schema is generated.
 
-Structured outputs require every field to be listed in `required`, so no field
-has a default: a value that isn't on the page comes back as null rather than as
-a missing key. That also gives Claude a way out instead of inventing a value.
-`extra="forbid"` produces the required `additionalProperties: false`.
+No field has a default, so every field is required: a value that isn't on the
+page comes back as null rather than as a missing key, which also gives Claude a
+way out instead of inventing a value. The API does allow optional fields, but
+each one makes the output grammar more complex and is moved after the required
+ones in the reply.
 
-The API guarantees the reply matches the schema, except after a refusal or
-max_tokens stop. So replies are still validated with InvoiceExtraction.
+INVOICE_SCHEMA comes from the SDK's transform_schema(), the same conversion
+client.messages.parse() uses. The API guarantees the reply matches it, except
+after a refusal or max_tokens stop, so replies are still validated with
+InvoiceExtraction (where extra="forbid" rejects unknown keys).
 """
 
+from anthropic import transform_schema
 from pydantic import BaseModel, ConfigDict, Field
 
 _STRICT = ConfigDict(extra="forbid")
@@ -52,41 +56,7 @@ class InvoiceExtraction(BaseModel):
     )
 
 
-def api_schema(model: type[BaseModel]) -> dict:
-    """Convert model_json_schema() output to the plain style the API docs use.
-
-    Only the spelling changes, never the meaning: nested models are inlined
-    instead of "$ref" links, `anyOf: [X, null]` becomes `type: [X, "null"]`,
-    and Pydantic's auto-generated titles are dropped.
-    """
-    raw = model.model_json_schema()
-    defs = raw.pop("$defs", {})
-
-    def clean(node):
-        if isinstance(node, list):
-            return [clean(n) for n in node]
-        if not isinstance(node, dict):
-            return node
-        if "$ref" in node:
-            return clean(defs[node["$ref"].split("/")[-1]])
-        node = {k: v for k, v in node.items() if k != "title"}
-        branches = node.get("anyOf", [])
-        if len(branches) == 2 and {"type": "null"} in branches:
-            (other,) = [b for b in branches if b != {"type": "null"}]
-            node = {"type": [other["type"], "null"], **_without(node, "anyOf")}
-        node = {"type": node["type"], **_without(node, "type")} if "type" in node else node
-        return {k: (v if k == "required" else clean(v)) for k, v in node.items()}
-
-    schema = clean(raw)
-    assert isinstance(schema, dict)
-    return schema
-
-
-def _without(d: dict, key: str) -> dict:
-    return {k: v for k, v in d.items() if k != key}
-
-
-INVOICE_SCHEMA = api_schema(InvoiceExtraction)
+INVOICE_SCHEMA = transform_schema(InvoiceExtraction)
 
 # What goes in the request:  "output_config": {"format": OUTPUT_FORMAT}
 OUTPUT_FORMAT = {"type": "json_schema", "schema": INVOICE_SCHEMA}

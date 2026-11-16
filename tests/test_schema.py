@@ -5,12 +5,13 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from anthropic import transform_schema
 from fakes import GOOD_EXTRACTION
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from invoice_batch.schema import (
     INVOICE_SCHEMA,
-    api_schema,
+    InvoiceExtraction,
     parse_extraction,
 )
 
@@ -45,39 +46,6 @@ def valid_input(**overrides) -> dict:
     return {**GOOD_EXTRACTION, **overrides}
 
 
-# --- api_schema(): Pydantic's spelling -> the spelling we send ---------------
-
-
-class Part(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str
-
-
-class Toy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    note: str | None = Field(description="Maybe a note.")
-    parts: list[Part]
-
-
-def test_api_schema_writes_nullable_as_a_type_list_and_keeps_the_description():
-    assert api_schema(Toy)["properties"]["note"] == {
-        "type": ["string", "null"],
-        "description": "Maybe a note.",
-    }
-
-
-def test_api_schema_inlines_nested_models_and_drops_titles_and_defs():
-    schema = api_schema(Toy)
-    assert schema["properties"]["parts"]["items"] == {
-        "type": "object",
-        "properties": {"name": {"type": "string"}},
-        "required": ["name"],
-        "additionalProperties": False,
-    }
-    text = json.dumps(schema)
-    assert "$ref" not in text and "$defs" not in text and '"title"' not in text
-
-
 # --- the structured-outputs rules, checked on the generated schema -----------
 
 
@@ -94,7 +62,12 @@ def test_every_object_forbids_additional_properties():
 
 @pytest.mark.parametrize("field", NULLABLE_FIELDS)
 def test_optional_fields_accept_null(field):
-    assert "null" in SCHEMA["properties"][field]["type"]
+    branches = SCHEMA["properties"][field]["anyOf"]
+    assert {"type": "null"} in branches
+
+
+def test_the_schema_is_the_sdk_transform_of_the_model():
+    assert SCHEMA == transform_schema(InvoiceExtraction)
 
 
 def test_every_top_level_field_tells_claude_what_it_is():

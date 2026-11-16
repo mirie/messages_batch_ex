@@ -13,10 +13,10 @@ def main() -> None:
     print(json.dumps(OUTPUT_FORMAT, indent=2))
     print("\n=== Fields at a glance ===\n")
     for name, spec in INVOICE_SCHEMA["properties"].items():
-        t = spec["type"]
-        t = " or ".join(t) if isinstance(t, list) else t
-        print(f"  {name:<15} {t}")
-    print("\n  The API guarantees Claude's reply is JSON with exactly these fields and types.")
+        types = [b["type"] for b in spec["anyOf"]] if "anyOf" in spec else [spec["type"]]
+        print(f"  {name:<15} {' or '.join(types)}")
+    print("\n  The API guarantees Claude's reply is JSON with exactly these fields and types")
+    print("  (unless it stops early with a refusal or max_tokens).")
     print("  It arrives as a text block; parse it with schema.parse_extraction().")
 
 
