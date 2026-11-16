@@ -16,10 +16,11 @@ from invoice_batch.batch import (
     build_requests,
     check_limits,
     estimate_batch_cost,
+    estimate_worst_rounds,
     submit,
     write_batch_record,
 )
-from invoice_batch.config import INVOICES_DIR, MODEL, RUNS_DIR, make_client
+from invoice_batch.config import ESCALATION_MODEL, INVOICES_DIR, MODEL, RUNS_DIR, make_client
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -44,6 +45,11 @@ def main(argv: list[str] | None = None) -> None:
     print(
         f"  estimated cost at batch price: ~${est['typical']:.4f} typical, "
         f"${est['worst']:.4f} if every request misses the cache"
+    )
+    worst_rounds = estimate_worst_rounds(len(requests), MODEL, ESCALATION_MODEL)
+    print(
+        f"  worst case, 3 rounds ({MODEL}, {MODEL} + hint, {ESCALATION_MODEL}; "
+        f"every doc fails every time): ${worst_rounds:.4f}"
     )
 
     if not args.yes:

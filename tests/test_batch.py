@@ -11,6 +11,7 @@ from invoice_batch.batch import (
     build_requests,
     check_limits,
     estimate_batch_cost,
+    estimate_worst_rounds,
     submit,
     write_batch_record,
 )
@@ -150,3 +151,10 @@ def test_estimate_worst_case_is_every_request_missing_the_cache():
 def test_estimate_uses_batch_prices():
     est = estimate_batch_cost(1, SONNET, input_tokens=1_000_000, output_tokens=0, prefix_tokens=0)
     assert est["worst"] == pytest.approx(1.00)  # $2/M standard, halved
+
+
+def test_worst_rounds_is_every_doc_failing_every_round_with_the_last_on_escalation():
+    haiku = estimate_batch_cost(23, "claude-haiku-5-5")["worst"]
+    sonnet = estimate_batch_cost(23, "claude-sonnet-5-5")["worst"]
+    worst = estimate_worst_rounds(23, "claude-haiku-5-5", "claude-sonnet-5-5", rounds=3)
+    assert worst == pytest.approx(haiku + haiku + sonnet)

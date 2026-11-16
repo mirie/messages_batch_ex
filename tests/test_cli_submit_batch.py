@@ -35,6 +35,7 @@ def test_without_yes_it_only_prints_the_plan(setup, capsys):
     assert not (tmp_path / "runs").exists()
     assert "2 requests" in out
     assert "--yes" in out
+    assert "worst case, 3 rounds" in out
 
 
 def test_with_yes_it_submits_and_writes_batch_json(setup, capsys):

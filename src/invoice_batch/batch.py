@@ -114,3 +114,17 @@ def estimate_batch_cost(
         "typical": write + max(n_requests - 1, 0) * read,
         "worst": n_requests * write,
     }
+
+
+def estimate_worst_rounds(
+    n_requests: int, model: str, escalation_model: str, rounds: int = 3
+) -> float:
+    """Ceiling for a full retry run: every document fails every round.
+
+    Rounds 1..rounds-1 run on model (the first plain, the next with a hint);
+    the last round runs on escalation_model. Each round uses the cache-miss
+    "worst" figure, so nothing here relies on cache hits.
+    """
+    normal = estimate_batch_cost(n_requests, model)["worst"]
+    escalated = estimate_batch_cost(n_requests, escalation_model)["worst"]
+    return (rounds - 1) * normal + escalated
