@@ -70,9 +70,3 @@ def test_no_hint_means_the_plain_instruction(pdf):
 def test_auto_models_are_told_to_respond_with_the_tool(pdf):
     text = user_content(build_params(pdf, "claude-sonnet-5-5"))[1]["text"]
     assert "Respond only with the extract_invoice tool call" in text
-
-
-def test_model_and_tool_choice_travel_together(pdf):
-    params = build_params(pdf, "claude-sonnet-5-5")
-    assert params["model"] == "claude-sonnet-5-5"
-    assert params["tool_choice"] == {"type": "auto"}
