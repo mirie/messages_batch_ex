@@ -83,9 +83,28 @@ def build_params(pdf_path: Path, model: str = MODEL, hint: str | None = None) ->
     return {
         "model": model,
         "max_tokens": MAX_TOKENS,
-        "system": [{"type": "text", "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
+        "system": [
+            {
+                "type": "text", 
+                "text": SYSTEM_PROMPT,
+                "cache_control": {
+                    "type": "ephemeral", 
+                    "ttl": "1h"
+                    }
+            }
+        ],
         "tools": [EXTRACT_INVOICE_TOOL],
         "tool_choice": tool_choice_for(model),
-        "messages": [{"role": "user", "content": [pdf_block(pdf_path), {"type": "text", "text": text}]}],
+        "messages": [
+            {
+                "role": "user", 
+                "content": [
+                    pdf_block(pdf_path), 
+                    {
+                        "type": "text", 
+                        "text": text
+                    }
+                ]
+            }
+        ],
     }

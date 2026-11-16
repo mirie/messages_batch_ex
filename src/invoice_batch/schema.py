@@ -1,8 +1,4 @@
-"""The extract_invoice tool, the "blank form" Claude fills in.
-
-Why a tool? With tool_choice forcing this tool, Claude's whole answer IS the
-tool call. Nothing has to run on our side, so it works inside a batch even
-though a batch request is only ONE turn.
+"""The extract_invoice tool, the data extracted from invoice PDF files.
 
 Nullable fields ("type": ["string", "null"]) let Claude say "not on the page"
 instead of inventing a value. strict: true makes the API guarantee the tool
