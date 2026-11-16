@@ -73,3 +73,18 @@ def test_it_writes_results_jsonl_and_prints_each_result_cost_and_wait(run, monke
     assert "invalid_request_error" in out
     assert "5m 15s" in out  # created_at -> ended_at
     assert "$" in out  # total cost
+
+
+def test_an_unpriced_model_still_saves_results_and_warns(run, monkeypatch, capsys):
+    items = [
+        succeeded_result(
+            "01_clean", [{"type": "text", "text": json.dumps(GOOD)}], model="claude-unpriced-9"
+        )
+    ]
+    status = batch_status("ended", succeeded=1, created_at=CREATED, ended_at=ENDED)
+    monkeypatch.setattr(collect_results, "make_client", lambda: fake_results_client(items, status))
+    collect_results.main([])
+    out = capsys.readouterr().out
+    assert (run / "results.jsonl").exists()
+    assert "$?" in out
+    assert "COST UNKNOWN" in out and "claude-unpriced-9" in out

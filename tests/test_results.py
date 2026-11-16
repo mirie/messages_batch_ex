@@ -83,6 +83,30 @@ def test_json_that_fails_validation_fails_the_check():
     assert "total" in rec["parse_problem"]
 
 
+@pytest.mark.parametrize("model", ["claude-unpriced-9", None])
+def test_an_unpriced_or_missing_model_records_no_cost_instead_of_crashing(model):
+    rec = record_from_result(succeeded_result("01_a", [text(GOOD)], model=model))
+    assert rec["cost_usd"] is None
+    assert "price" in rec["cost_problem"] or "model" in rec["cost_problem"]
+    assert rec["parse_ok"] is True  # the extraction is still kept
+
+
+def test_a_priced_result_has_no_cost_problem():
+    rec = record_from_result(succeeded_result("01_a", [text(GOOD)]))
+    assert rec["cost_problem"] is None
+
+
+def test_total_cost_skips_results_with_no_known_cost():
+    records, *_ = collect(
+        [
+            succeeded_result("01_a", [text(GOOD)]),
+            succeeded_result("02_b", [text(GOOD)], model="claude-unpriced-9"),
+        ],
+        expected_ids=["01_a", "02_b"],
+    )
+    assert total_cost(records) == pytest.approx(records[0]["cost_usd"])
+
+
 # --- errored / canceled / expired ----------------------------------------------------
 
 

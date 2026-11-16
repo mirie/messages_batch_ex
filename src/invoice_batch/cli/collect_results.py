@@ -34,12 +34,16 @@ def _extraction_text(ex: dict) -> str:
     )
 
 
+def _cost_text(rec: dict) -> str:
+    return "$?" if rec["cost_usd"] is None else f"${rec['cost_usd']:.6f}"
+
+
 def print_record(rec: dict) -> None:
     cid, kind = rec["custom_id"], rec["result_type"]
     if kind == "succeeded":
         print(
             f"{cid:<26} succeeded  {rec['stop_reason']:<10} "
-            f"{_usage_text(rec['usage'])}  ${rec['cost_usd']:.6f}"
+            f"{_usage_text(rec['usage'])}  {_cost_text(rec)}"
         )
         if rec["parse_ok"]:
             print(f"{'':<26} {_extraction_text(rec['extraction'])}")
@@ -91,6 +95,9 @@ def main(argv: list[str] | None = None) -> None:
     print(f"check failed:  {len(failed)} of {len(billed)} succeeded results")
     print(f"cache hits:    {cache_reads} of {len(billed)} billed requests read the cached prefix")
     print(f"actual cost:   ${total_cost(records):.6f} at batch price (only succeeded is billed)")
+    unknown = [r for r in billed if r["cost_usd"] is None]
+    if unknown:
+        print(f"COST UNKNOWN for {len(unknown)} results: {unknown[0]['cost_problem']}")
     print(f"created_at:    {utc_text(batch.created_at)}")
     print(f"ended_at:      {utc_text(batch.ended_at)}")
     print(f"real wait:     {elapsed_text(batch.ended_at - batch.created_at)}")

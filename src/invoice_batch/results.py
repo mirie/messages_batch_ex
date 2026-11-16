@@ -17,6 +17,9 @@ Only "succeeded" results are billed. A succeeded result can still fail our
 check: a refusal or max_tokens stop breaks the JSON-outputs guarantee, and the
 text might not validate. That is recorded as parse_ok False + parse_problem;
 deciding what to do about it is stage 7 (triage).
+
+A model with no entry in PRICES gives cost_usd None + cost_problem instead of
+an exception, so one unpriced result never stops results.jsonl being written.
 """
 
 import json
@@ -39,6 +42,7 @@ def record_from_result(raw: dict) -> dict:
         "stop_reason": None,
         "usage": None,
         "cost_usd": 0.0,
+        "cost_problem": None,
         "thinking": None,
         "extraction": None,
         "parse_ok": False,
@@ -61,7 +65,7 @@ def _fill_succeeded(rec: dict, message: dict) -> None:
     rec["model"] = message.get("model")
     rec["stop_reason"] = message.get("stop_reason")
     rec["usage"] = message.get("usage") or {}
-    rec["cost_usd"] = cost_usd(rec["usage"], rec["model"], batch=True)
+    rec["cost_usd"], rec["cost_problem"] = _cost(rec["usage"], rec["model"])
 
     summaries = [b.get("thinking") for b in content if b.get("type") == "thinking"]
     summaries = [s.strip() for s in summaries if s and s.strip()]
@@ -85,6 +89,15 @@ def _fill_succeeded(rec: dict, message: dict) -> None:
     rec["parse_ok"] = True
 
 
+def _cost(usage: dict, model: str | None) -> tuple[float | None, str | None]:
+    if not model:
+        return None, "message has no model, so its cost is unknown"
+    try:
+        return cost_usd(usage, model, batch=True), None
+    except ValueError as e:  # no price for this model
+        return None, str(e)
+
+
 def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str]]:
     """Records sorted by custom_id, plus any expected ids with no result."""
     by_id = {}
@@ -96,7 +109,8 @@ def collect(raws, expected_ids: list[str]) -> tuple[list[dict], list[str]]:
 
 
 def total_cost(records: list[dict]) -> float:
-    return sum(r["cost_usd"] for r in records)
+    """Sum of known costs; results with cost_usd None are left out."""
+    return sum(r["cost_usd"] for r in records if r["cost_usd"] is not None)
 
 
 def write_results_jsonl(run_dir: Path, records: list[dict]) -> Path:
