@@ -50,7 +50,7 @@ def test_hints_go_only_to_their_own_document(pdf_dir):
 
 def test_every_request_shares_the_same_cached_prefix(pdf_dir):
     reqs = build_requests(["01_a", "02_b", "03_c"], pdf_dir=pdf_dir)
-    prefixes = {json.dumps([r["params"]["tools"], r["params"]["system"]]) for r in reqs}
+    prefixes = {json.dumps([r["params"]["system"], r["params"]["output_config"]]) for r in reqs}
     assert len(prefixes) == 1  # identical bytes, so the cache can be shared
 
 

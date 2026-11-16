@@ -1,14 +1,21 @@
-"""The extract_invoice tool must satisfy strict tool use rules, and the
+"""The invoice JSON schema must satisfy the structured-outputs rules, and the
 Pydantic model must mirror it so our code can validate what comes back."""
 
 import copy
+import json
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
-from invoice_batch.schema import EXTRACT_INVOICE_TOOL, InvoiceExtraction
+from invoice_batch.schema import (
+    INVOICE_SCHEMA,
+    OUTPUT_FORMAT,
+    InvoiceExtraction,
+    parse_extraction,
+)
 
-SCHEMA = EXTRACT_INVOICE_TOOL["input_schema"]
+SCHEMA = INVOICE_SCHEMA
 NULLABLE_FIELDS = [
     "invoice_no",
     "vendor",
@@ -49,8 +56,8 @@ def valid_input(**overrides) -> dict:
     return data
 
 
-def test_tool_uses_strict_mode():
-    assert EXTRACT_INVOICE_TOOL["strict"] is True
+def test_output_format_wraps_the_schema_as_json_schema():
+    assert OUTPUT_FORMAT == {"type": "json_schema", "schema": INVOICE_SCHEMA}
 
 
 def test_every_top_level_property_is_required():
@@ -135,3 +142,30 @@ def test_pydantic_model_rejects_a_missing_field():
     del data["total"]
     with pytest.raises(ValidationError):
         InvoiceExtraction.model_validate(data)
+
+
+# --- reading Claude's reply ------------------------------------------------
+
+
+def block(type_, **fields):
+    return SimpleNamespace(type=type_, **fields)
+
+
+def test_reply_is_read_from_the_text_block():
+    content = [block("text", text=json.dumps(valid_input()))]
+    assert parse_extraction(content).invoice_no == "INV-1"
+
+
+def test_thinking_blocks_before_the_reply_are_skipped():
+    content = [block("thinking", thinking=""), block("text", text=json.dumps(valid_input()))]
+    assert parse_extraction(content).vendor == "Acme"
+
+
+def test_a_reply_without_a_text_block_is_an_error():
+    with pytest.raises(ValueError, match="no text block"):
+        parse_extraction([block("thinking", thinking="")])
+
+
+def test_a_reply_that_does_not_match_the_model_is_an_error():
+    with pytest.raises(ValidationError):
+        parse_extraction([block("text", text='{"is_invoice": true}')])

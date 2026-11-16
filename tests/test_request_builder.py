@@ -4,8 +4,8 @@ import base64
 
 import pytest
 
-from invoice_batch.request_builder import build_params, tool_choice_for
-from invoice_batch.schema import TOOL_NAME
+from invoice_batch.request_builder import build_params
+from invoice_batch.schema import OUTPUT_FORMAT
 
 FAKE_PDF = b"%PDF-1.4 not a real pdf, build_params does not parse it\n" * 40
 
@@ -21,16 +21,6 @@ def user_content(params):
     (message,) = params["messages"]
     assert message["role"] == "user"
     return message["content"]
-
-
-@pytest.mark.parametrize("model", ["claude-haiku-5-5", "claude-sonnet-5"])
-def test_models_that_allow_it_get_a_forced_tool_choice(model):
-    assert tool_choice_for(model) == {"type": "tool", "name": TOOL_NAME}
-
-
-@pytest.mark.parametrize("model", ["claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"])
-def test_models_that_reject_forcing_get_auto(model):
-    assert tool_choice_for(model) == {"type": "auto"}
 
 
 def test_document_block_comes_before_the_text(pdf):
@@ -53,8 +43,21 @@ def test_system_prompt_is_cached_for_one_hour(pdf):
     assert system_block["cache_control"] == {"type": "ephemeral", "ttl": "1h"}
 
 
-def test_request_sends_only_the_extract_invoice_tool(pdf):
-    assert [t["name"] for t in build_params(pdf, "claude-haiku-5-5")["tools"]] == [TOOL_NAME]
+def test_reply_is_constrained_to_the_invoice_json_schema(pdf):
+    assert build_params(pdf, "claude-haiku-5-5")["output_config"] == {"format": OUTPUT_FORMAT}
+
+
+def test_no_tools_are_sent(pdf):
+    params = build_params(pdf, "claude-haiku-5-5")
+    assert "tools" not in params
+    assert "tool_choice" not in params
+
+
+def test_every_model_gets_the_same_request_apart_from_the_model_name(pdf):
+    haiku = build_params(pdf, "claude-haiku-5-5")
+    sonnet = build_params(pdf, "claude-sonnet-5-5")
+    assert sonnet["model"] == "claude-sonnet-5-5"
+    assert {**sonnet, "model": "claude-haiku-5-5"} == haiku
 
 
 def test_hint_is_appended_to_the_user_text(pdf):
@@ -65,8 +68,3 @@ def test_hint_is_appended_to_the_user_text(pdf):
 def test_no_hint_means_the_plain_instruction(pdf):
     text = user_content(build_params(pdf, "claude-haiku-5-5"))[1]["text"]
     assert "previous attempt" not in text
-
-
-def test_auto_models_are_told_to_respond_with_the_tool(pdf):
-    text = user_content(build_params(pdf, "claude-sonnet-5-5"))[1]["text"]
-    assert "Respond only with the extract_invoice tool call" in text

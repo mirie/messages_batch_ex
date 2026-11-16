@@ -15,6 +15,7 @@ import anthropic
 from invoice_batch.config import MODEL, make_client, pdf_path_for
 from invoice_batch.pricing import cost_usd
 from invoice_batch.request_builder import build_params
+from invoice_batch.schema import parse_extraction
 
 DOCS = ["01_clean_classic", "19_unusual_format", "22_letter", "21_corrupt"]
 
@@ -46,11 +47,14 @@ def main() -> None:
         print(f"stop_reason: {msg.stop_reason}    took {elapsed:.1f}s")
         print(f"content block types: {[b.type for b in msg.content]}")
         for block in msg.content:
-            if block.type == "tool_use":
-                print("raw tool_use block:")
-                print(json.dumps(block.model_dump(), indent=2, ensure_ascii=False))
-            elif block.type == "text":
-                print(f"text: {block.text}")
+            if block.type == "text":
+                print("raw text block (the JSON reply):")
+                print(block.text)
+            elif block.type == "thinking":
+                print(f"thinking block ({len(block.thinking)} chars shown)")
+        parsed = parse_extraction(msg.content)
+        print("parsed into InvoiceExtraction:")
+        print(json.dumps(parsed.model_dump(), indent=2, ensure_ascii=False))
         print(
             f"usage: input={usage['input_tokens']} output={usage['output_tokens']} "
             f"cache_write={usage.get('cache_creation_input_tokens')} "

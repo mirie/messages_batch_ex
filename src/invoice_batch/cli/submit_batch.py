@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"Batch plan: {len(requests)} requests, model {MODEL}")
     print(f"  size: {batch_size_bytes(requests) / 1024:,.0f} KB (limit 256 MB)")
     print(f"  custom_ids: {custom_ids[0]} ... {custom_ids[-1]}")
-    print(f"  tool_choice: {requests[0]['params']['tool_choice']}")
+    print("  reply format: output_config.format (invoice JSON schema)")
     print(
         f"  estimated cost at batch price: ~${est['typical']:.4f} typical, "
         f"${est['worst']:.4f} if every request misses the cache"

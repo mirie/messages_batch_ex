@@ -1,29 +1,23 @@
-"""Stage 2: print the extract_invoice tool definition.
+"""Stage 2: print the invoice JSON schema that every request sends.
 
 Run:  uv run show-schema     (no API call, no key needed)
 """
 
 import json
 
-from invoice_batch.config import ESCALATION_MODEL, MODEL
-from invoice_batch.request_builder import tool_choice_for
-from invoice_batch.schema import EXTRACT_INVOICE_TOOL
+from invoice_batch.schema import INVOICE_SCHEMA, OUTPUT_FORMAT
 
 
 def main() -> None:
-    print("=== The tool definition sent with every request ===\n")
-    print(json.dumps(EXTRACT_INVOICE_TOOL, indent=2))
+    print('=== Sent with every request as  "output_config": {"format": ...} ===\n')
+    print(json.dumps(OUTPUT_FORMAT, indent=2))
     print("\n=== Fields at a glance ===\n")
-    for name, spec in EXTRACT_INVOICE_TOOL["input_schema"]["properties"].items():
+    for name, spec in INVOICE_SCHEMA["properties"].items():
         t = spec["type"]
         t = " or ".join(t) if isinstance(t, list) else t
         print(f"  {name:<15} {t}")
-    print("\n=== tool_choice per model ===\n")
-    for m in (MODEL, ESCALATION_MODEL):
-        print(f"  {m:<20} {json.dumps(tool_choice_for(m))}")
-    print("\n  Forced ({'type': 'tool'}) means the reply can only be this tool call.")
-    print("  'auto' is used where the model rejects forced tool use (400 error);")
-    print("  the prompt then asks for the tool, and strict: true still guarantees the shape.")
+    print("\n  The API guarantees Claude's reply is JSON with exactly these fields and types.")
+    print("  It arrives as a text block; parse it with schema.parse_extraction().")
 
 
 if __name__ == "__main__":

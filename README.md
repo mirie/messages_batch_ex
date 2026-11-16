@@ -4,7 +4,7 @@ A small Python learning project that extracts fields from fake PDF invoices with
 
 This is a self-directed experiment. It uses 23 generated invoices, some clean and some deliberately broken, to show what the Batches API does with tool calls, timing, cost, retries, and failures.
 
-Status: stages 1–3 are built (test data, tool schema, synchronous dry run). Batch stages are added one at a time.
+Status: stages 1–4 are built (test data, JSON schema, synchronous dry run, batch submit). Batch stages are added one at a time.
 
 ## Setup
 
@@ -44,16 +44,19 @@ Each stage is a command registered in `pyproject.toml` under `[project.scripts]`
 | Stage | Command | Calls the API? |
 | --- | --- | --- |
 | 1 | `uv run generate-invoices` | No. Writes `data/invoices/*.pdf` and `data/ground_truth.json` |
-| 2 | `uv run show-schema` | No. Prints the tool definition |
+| 2 | `uv run show-schema` | No. Prints the invoice JSON schema |
 | 3 | `uv run dry-run` | Yes, 4 synchronous requests (well under $0.01) |
+| 4 | `uv run submit-batch` | Only with `--yes`. Without it, prints the plan and a cost estimate |
 
 ## Test
 
 ```bash
 uv run pytest
+uv run ruff format .     # format
+uv run ruff check .      # lint
 ```
 
-The tests never call the API. They cover the tool schema (strict-mode rules), the request builder, pricing, the API key check, and the generated test set (counts, totals, reproducibility). New behavior is added test-first: write a failing test, then the code that makes it pass.
+The tests never call the API. They cover the invoice JSON schema (structured-output rules, and a field-by-field match with the Pydantic model), the request builder, batch building and submitting (with a fake client), pricing, the API key check, and the generated test set (counts, totals, reproducibility). New behavior is added test-first: write a failing test, then the code that makes it pass.
 
 ## How it works
 
@@ -82,36 +85,34 @@ Claude receives each PDF page as an image **and** as its extracted text. Small g
 sequenceDiagram
     participant Code as Data extraction code
     participant API as Messages API
-    Code->>API: PDF + extract_invoice tool + tool_choice {"type":"tool"}
-    API-->>Code: stop_reason "tool_use", content = [tool_use {input: {...fields}}]
-    Note over Code: Nothing to run. Read block.input and you're done.
+    Code->>API: PDF + output_config.format (invoice JSON schema)
+    API-->>Code: stop_reason "end_turn", content = [text '{"vendor": ...}']
+    Note over Code: json-parse the text block with parse_extraction() and you're done.
 ```
 
-`extract_invoice` (`schema.py`) is a form with nullable fields, `is_invoice`, and an `issues` list. Forcing the tool makes Claude's whole reply a single `tool_use` block whose `input` is the extracted data. No tool result has to be sent back, so this works in a batch, where every request is exactly one turn.
+`INVOICE_SCHEMA` (`schema.py`) describes the reply: nullable fields, `is_invoice`, and an `issues` list. Sending it as `output_config.format` makes the API guarantee that Claude's reply is JSON matching the schema (keys, types, no extras). Nullable fields (`["string", "null"]`) let Claude report "not printed" instead of inventing a value. Every model gets the same request, so the Haiku attempts and the Sonnet escalation look identical.
 
-`strict: true` makes the API guarantee the input matches the schema (keys, types, no extras). Nullable fields (`["string", "null"]`) let Claude report "not printed" instead of inventing a value.
+### Structured outputs: JSON outputs vs. strict tools
+
+The API has two structured-output features. This project uses the first; stage 10 uses the second.
+
+| Feature | Set on | Guarantees | Use when |
+| --- | --- | --- | --- |
+| JSON outputs | `output_config.format` | Claude's **reply** is JSON matching the schema | You just want the answer as data (this project's extraction) |
+| Strict tool use | `strict: true` on a tool | A **tool call's arguments** match the tool's schema | Claude calls a tool that your code runs (stage 10's `lookup_crm`) |
+
+Neither forces the other: JSON outputs never produce a tool call, and `strict` doesn't make Claude call a tool, it only guarantees the arguments when it does.
 
 ### One request
 
 ```
-system  (cache_control, 1h)  ─┐  identical for every document,
-tools   [extract_invoice]     ─┘  so this prefix can be cached
+system  (cache_control, 1h)       identical for every document, so it can be cached
+output_config.format              the invoice JSON schema (same for every document)
 messages[0] user:
     document  (base64 PDF)
-    text      "Extract this document by calling the extract_invoice tool."
+    text      "Extract the data from this document."
               (+ a hint on retries)
 ```
-
-### Forced vs. auto tool choice
-
-The docs (Tool use → Forcing tool use) say Claude Sonnet 5.5, Opus 5.5, and the Fable/Mythos 5.1–5.2 models return a 400 for `tool_choice` `tool` **or** `any`, inside batches too. Haiku 5.5 accepts it.
-
-| Model | `tool_choice` used | What guarantees the result |
-| --- | --- | --- |
-| `claude-haiku-5-5` | `{"type":"tool","name":"extract_invoice"}` | The API forces the call; `strict` forces the shape |
-| `claude-sonnet-5-5` | `{"type":"auto"}` | The prompt asks for the tool; `strict` forces the shape *if* it calls it |
-
-`request_builder.tool_choice_for()` picks the right one per model. It is a lookup rather than a hard-coded choice because `MODEL` and `ESCALATION_MODEL` can be overridden. If an `auto` reply has no `tool_use` block, triage counts it as a failed check.
 
 ## Code organization
 
@@ -120,8 +121,9 @@ The code is a package in `src/invoice_batch/`. Library modules hold the logic an
 ```
 src/invoice_batch/
 ├── config.py            paths, MODEL / ESCALATION_MODEL, API key check, client
-├── schema.py            EXTRACT_INVOICE_TOOL + Pydantic InvoiceExtraction
-├── request_builder.py   system prompt, tool_choice_for(), build_params()
+├── schema.py            INVOICE_SCHEMA, OUTPUT_FORMAT, InvoiceExtraction, parse_extraction()
+├── request_builder.py   system prompt, build_params()
+├── batch.py             build_requests(), check_limits(), submit(), estimate_batch_cost()
 ├── pricing.py           PRICES, cost_usd() (standard vs. batch)
 ├── synthetic/           the fake test set
 │   ├── data.py          vendors, customers, make_invoice(), truth_of()
@@ -130,14 +132,16 @@ src/invoice_batch/
 └── cli/                 one module per command
     ├── generate_invoices.py
     ├── show_schema.py
-    └── dry_run.py
+    ├── dry_run.py
+    └── submit_batch.py
 tests/                   pytest, one file per library module
 ```
 
-- `schema.py`: `EXTRACT_INVOICE_TOOL` is sent to the API; `InvoiceExtraction` validates what comes back.
+- `schema.py`: `OUTPUT_FORMAT` is sent to the API; `parse_extraction()` reads the reply's text block into an `InvoiceExtraction`.
 - `request_builder.py`: `build_params()` returns the full request for one PDF. The dry run and the batch stages use the same function.
 - `synthetic/build.py`: `generate(out_dir, seed=42)` writes the PDFs and ground truth. It takes the output folder as an argument, so tests can write to a temporary folder.
-- `cli/dry_run.py`: sends 4 documents synchronously and prints the raw `tool_use` block, `stop_reason`, usage, and any error.
+- `cli/dry_run.py`: sends 4 documents synchronously and prints the raw JSON text block, the parsed result, `stop_reason`, usage, and any error.
+- `batch.py` / `cli/submit_batch.py`: builds one request per PDF, checks the batch limits, prints a cost estimate, and only submits with `--yes`. Saves `runs/<timestamp>/batch.json`.
 
 ## Project files
 
