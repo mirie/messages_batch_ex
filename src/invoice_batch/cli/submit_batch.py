@@ -23,7 +23,9 @@ from invoice_batch.config import INVOICES_DIR, MODEL, RUNS_DIR, make_client
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="submit-batch", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        prog="submit-batch", description="Submit every PDF in data/invoices/ as ONE Message Batch."
+    )
     parser.add_argument("--yes", action="store_true", help="really submit (costs money)")
     args = parser.parse_args(argv)
 
