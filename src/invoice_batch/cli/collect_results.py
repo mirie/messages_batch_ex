@@ -13,7 +13,7 @@ import json
 
 from invoice_batch.config import RUNS_DIR, make_client
 from invoice_batch.results import collect, total_cost, write_results_jsonl
-from invoice_batch.status import elapsed_text, resolve_batch, utc_text
+from invoice_batch.status import display_path, elapsed_text, resolve_batch, utc_text
 
 
 def _usage_text(usage: dict) -> str:
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"created_at:    {utc_text(batch.created_at)}")
     print(f"ended_at:      {utc_text(batch.ended_at)}")
     print(f"real wait:     {elapsed_text(batch.ended_at - batch.created_at)}")
-    print(f"\nsaved: {path.relative_to(RUNS_DIR.parent)}")
+    print(f"\nsaved: {display_path(path, RUNS_DIR.parent)}")
     print("Next: uv run triage")
 
 

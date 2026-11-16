@@ -62,3 +62,10 @@ def test_check_writes_the_latest_status_back_into_batch_json(runs, monkeypatch):
     saved = json.loads((runs / "runs" / "20261116-011243" / "batch.json").read_text())
     assert saved["processing_status"] == "ended"
     assert saved["batch_id"] == "msgbatch_real"
+
+
+def test_a_relative_run_folder_argument_works(runs, monkeypatch, capsys):
+    _use_client(monkeypatch, [batch_status("in_progress", processing=23, created_at=CREATED)])
+    monkeypatch.chdir(runs)
+    check_batch.main(["runs/20261116-011243"])
+    assert "msgbatch_real" in capsys.readouterr().out

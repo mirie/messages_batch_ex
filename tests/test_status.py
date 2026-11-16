@@ -8,6 +8,7 @@ from fakes import FakeClock, batch_status, fake_status_client
 
 from invoice_batch.status import (
     describe,
+    display_path,
     elapsed_text,
     resolve_batch,
     watch,
@@ -46,6 +47,28 @@ def test_a_batch_id_argument_finds_its_run_folder(tmp_path):
 
 def test_an_unknown_batch_id_is_still_checked_without_a_folder(tmp_path):
     assert resolve_batch("msgbatch_elsewhere", tmp_path) == ("msgbatch_elsewhere", None)
+
+
+def test_a_relative_run_folder_comes_back_absolute(tmp_path, monkeypatch):
+    run = _write_run(tmp_path / "runs", "20261116-011243", "msgbatch_new")
+    monkeypatch.chdir(tmp_path)
+    batch_id, folder = resolve_batch("runs/20261116-011243", tmp_path / "runs")
+    assert batch_id == "msgbatch_new"
+    assert folder.is_absolute()
+    assert folder == run.resolve()
+
+
+@pytest.mark.parametrize("arg", ["runs/2026111-011243", "runs/20261116-011243/"])
+def test_a_path_without_batch_json_is_a_clear_error_not_a_batch_id(tmp_path, monkeypatch, arg):
+    (tmp_path / "runs" / "20261116-011243").mkdir(parents=True)  # exists, but no batch.json
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit, match="batch.json"):
+        resolve_batch(arg, tmp_path / "runs")
+
+
+def test_display_path_is_relative_to_the_project_when_it_can_be(tmp_path):
+    assert display_path(tmp_path / "runs" / "x", tmp_path) == "runs/x"
+    assert display_path(tmp_path / "x", tmp_path / "elsewhere") == str(tmp_path / "x")
 
 
 def test_no_runs_at_all_is_a_clear_error(tmp_path):

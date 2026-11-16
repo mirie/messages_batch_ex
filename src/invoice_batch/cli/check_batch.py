@@ -12,7 +12,13 @@ import time
 from datetime import UTC, datetime
 
 from invoice_batch.config import RUNS_DIR, make_client
-from invoice_batch.status import describe, resolve_batch, update_batch_record, watch
+from invoice_batch.status import (
+    describe,
+    display_path,
+    resolve_batch,
+    update_batch_record,
+    watch,
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -27,7 +33,7 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     batch_id, run_dir = resolve_batch(args.batch, RUNS_DIR)
-    where = f"  ({run_dir.relative_to(RUNS_DIR.parent)})" if run_dir else ""
+    where = f"  ({display_path(run_dir, RUNS_DIR.parent)})" if run_dir else ""
     print(f"Batch {batch_id}{where}\n")
 
     client = make_client()

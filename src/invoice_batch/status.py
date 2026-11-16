@@ -22,8 +22,12 @@ def resolve_batch(arg: str | None, runs_dir: Path) -> tuple[str, Path | None]:
     """Turn the command-line argument into (batch_id, run folder or None).
 
     None            -> the newest runs/*/batch.json (folders are timestamps)
-    a folder path   -> that folder's batch.json
+    a folder path   -> that folder's batch.json (returned as an absolute path)
     a batch id      -> the run folder that recorded it, if there is one
+
+    Batch ids never contain "/", so an argument with a "/" (or one naming an
+    existing folder) is a path. A path without batch.json is an error, not a
+    batch id: a typo should say "not found", not send the path to the API.
     """
     records = sorted(runs_dir.glob("*/batch.json"))
     if arg is None:
@@ -31,14 +35,24 @@ def resolve_batch(arg: str | None, runs_dir: Path) -> tuple[str, Path | None]:
             raise SystemExit(f"No runs found in {runs_dir}. Submit one first: uv run submit-batch")
         return _read_id(records[-1]), records[-1].parent
 
-    folder = Path(arg)
+    folder = Path(arg).resolve()
     if (folder / "batch.json").is_file():
         return _read_id(folder / "batch.json"), folder
+    if "/" in arg or folder.is_dir():
+        raise SystemExit(f"No batch.json in {arg}. Is the run folder name right? See {runs_dir}")
 
     for record in records:
         if _read_id(record) == arg:
             return arg, record.parent
     return arg, None
+
+
+def display_path(path: Path, base: Path) -> str:
+    """path relative to base when it is inside it, else the full path."""
+    try:
+        return str(path.resolve().relative_to(base.resolve()))
+    except ValueError:
+        return str(path)
 
 
 def _read_id(record: Path) -> str:
