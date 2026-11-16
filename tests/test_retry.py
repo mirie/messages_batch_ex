@@ -5,7 +5,7 @@ import json
 import pytest
 from fakes import make_run
 
-from invoice_batch.retry import child_runs, hint_for, load_histories, plan_retries
+from invoice_batch.retry import find_retry_runs, hint_for, load_histories, plan_retries
 
 HAIKU = "claude-haiku-5-5"
 SONNET = "claude-sonnet-5-5"
@@ -122,8 +122,8 @@ def test_a_parent_without_results_stops_with_a_clear_message(tmp_path):
         load_histories(r2, tmp_path)
 
 
-def test_child_runs_finds_retries_already_submitted_from_a_run(tmp_path):
+def test_find_retry_runs_returns_the_runs_that_retry_a_run(tmp_path):
     r1 = make_run(tmp_path, "r1")
     make_run(tmp_path, "r2", batch_id="b2", parent_run="r1")
     make_run(tmp_path, "r3", batch_id="b3")
-    assert [p.name for p in child_runs(r1, tmp_path)] == ["r2"]
+    assert [run.name for run in find_retry_runs(r1, tmp_path)] == ["r2"]

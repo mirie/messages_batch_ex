@@ -28,7 +28,7 @@ from invoice_batch.batch import (
     write_batch_record,
 )
 from invoice_batch.config import ESCALATION_MODEL, INVOICES_DIR, MODEL, RUNS_DIR, make_client
-from invoice_batch.retry import child_runs, plan_retries
+from invoice_batch.retry import find_retry_runs, plan_retries
 from invoice_batch.runs import add_batch_argument, display_path, load_batch_record, resolve_batch
 from invoice_batch.triage import ATTEMPT_LIMIT
 
@@ -64,11 +64,12 @@ def main(argv: list[str] | None = None) -> None:
     triage = json.loads(triage_path.read_text())
     parent_record = load_batch_record(run_dir)
 
-    already = child_runs(run_dir, RUNS_DIR)
-    if already:
+    existing_retries = find_retry_runs(run_dir, RUNS_DIR)
+    if existing_retries:
+        retry_name = existing_retries[0].name
         raise SystemExit(
-            f"{run_dir.name} was already retried in {already[0].name}. "
-            f"Continue from there: uv run triage {already[0].name}"
+            f"{run_dir.name} was already retried in {retry_name}. "
+            f"Continue from there: uv run triage {retry_name}"
         )
 
     round_no = triage.get("round", 1) + 1
