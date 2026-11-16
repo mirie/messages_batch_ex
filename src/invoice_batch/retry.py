@@ -100,7 +100,11 @@ def load_histories(run_dir: Path, runs_dir: Path) -> dict[str, list[dict]]:
 
 
 def child_runs(run_dir: Path, runs_dir: Path) -> list[Path]:
-    """Return the run folders that retry run_dir (their parent_run is run_dir)."""
+    """Return the run folders that were made to retry run_dir.
+
+    retry-batch uses this to check whether run_dir has already been retried.
+    A folder counts if its batch.json has parent_run set to run_dir's name.
+    """
     children = []
     for record in sorted(runs_dir.glob(f"*/{BATCH_RECORD}")):
         try:
