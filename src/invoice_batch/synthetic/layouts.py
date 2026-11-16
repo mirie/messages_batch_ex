@@ -15,8 +15,15 @@ def right(c, x, y, text):
     c.drawRightString(x, y, text)
 
 
-def layout_classic(c, inv, *, fmt_date=lambda d: d.isoformat(), show_due=True,
-                   footer_note=None, total_override=None):
+def layout_classic(
+    c,
+    inv,
+    *,
+    fmt_date=lambda d: d.isoformat(),
+    show_due=True,
+    footer_note=None,
+    total_override=None,
+):
     """Plain black-and-white invoice with a ruled table."""
     cur = inv["currency"]
     c.setFont("Helvetica-Bold", 18)
@@ -69,8 +76,9 @@ def layout_classic(c, inv, *, fmt_date=lambda d: d.isoformat(), show_due=True,
         c.setFillColor(colors.black)
 
 
-def layout_modern(c, inv, *, fmt_date=lambda d: f"{d:%B} {d.day}, {d.year}",
-                  money_fmt=None, show_due=True):
+def layout_modern(
+    c, inv, *, fmt_date=lambda d: f"{d:%B} {d.day}, {d.year}", money_fmt=None, show_due=True
+):
     """Colored header band, two-column details, zebra-striped items."""
     cur = inv["currency"]
     money_fmt = money_fmt or (lambda x: money(x, cur))
@@ -160,8 +168,10 @@ def layout_compact(c, inv, *, show_due=True, total_override=None):
     for it in inv["line_items"]:
         y -= 13
         c.drawString(x0, y, it["description"][:40])
-        kv(f"  {it['quantity']} x {it['unit_price']:,.2f}",
-           f"{it['quantity'] * it['unit_price']:,.2f}")
+        kv(
+            f"  {it['quantity']} x {it['unit_price']:,.2f}",
+            f"{it['quantity'] * it['unit_price']:,.2f}",
+        )
     y -= 13
     c.drawString(x0, y, dash)
     c.setFont("Courier-Bold", 11)
@@ -180,23 +190,39 @@ def layout_cluttered(c, inv, rng):
     c.setFont("Helvetica", 6)
     c.setFillColor(colors.Color(0.80, 0.80, 0.80))
     for yy in range(30, 780, 8):
-        c.drawString(20, yy, " ".join(
-            f"{rng.randint(0, 9999):04d}.{rng.randint(0, 99):02d}" for _ in range(19)))
+        c.drawString(
+            20,
+            yy,
+            " ".join(f"{rng.randint(0, 9999):04d}.{rng.randint(0, 99):02d}" for _ in range(19)),
+        )
     c.setFillColor(colors.black)
 
     # 2) the real content, small and cramped
     c.setFont("Helvetica-Bold", 11)
     c.drawString(40, 750, inv["vendor"] + "  —  TAX INVOICE / COPY 3 OF 3")
     c.setFont("Helvetica", 6.5)
-    c.drawString(40, 740, " / ".join(inv["vendor_address"]) + "   VAT 80 336 6086 98   Reg 0068 3389")
-    c.drawString(40, 728, f"Inv {inv['invoice_no']}  Iss {inv['issue_date']:%d/%m/%y}  "
-                          f"Due {inv['due_date']:%d/%m/%y}  PO 8803-6608  Acct 3868-0838")
+    c.drawString(
+        40, 740, " / ".join(inv["vendor_address"]) + "   VAT 80 336 6086 98   Reg 0068 3389"
+    )
+    c.drawString(
+        40,
+        728,
+        f"Inv {inv['invoice_no']}  Iss {inv['issue_date']:%d/%m/%y}  "
+        f"Due {inv['due_date']:%d/%m/%y}  PO 8803-6608  Acct 3868-0838",
+    )
     c.drawString(40, 718, f"To {inv['customer_name']} <{inv['customer_email']}>")
 
     y = 700
     c.setFont("Helvetica-Bold", 6.5)
-    for x, h in [(40, "Ref"), (85, "Description"), (300, "Qty"), (340, "Unit"),
-                 (400, "Disc"), (450, "Net"), (520, "Line")]:
+    for x, h in [
+        (40, "Ref"),
+        (85, "Description"),
+        (300, "Qty"),
+        (340, "Unit"),
+        (400, "Disc"),
+        (450, "Net"),
+        (520, "Line"),
+    ]:
         c.drawString(x, y, h)
     c.setFont("Helvetica", 6.5)
     for it in inv["line_items"]:
@@ -233,15 +259,23 @@ def draw_letter(c):
     c.drawString(60, 730, "Tidewater Print Studio")
     c.setFont("Helvetica", 10)
     lines = [
-        "55 Harbor Way, Norfolk, VA 23510", "", "June 2, 2026", "",
-        "Dear Ms. Sato,", "",
+        "55 Harbor Way, Norfolk, VA 23510",
+        "",
+        "June 2, 2026",
+        "",
+        "Dear Ms. Sato,",
+        "",
         "Thank you for another wonderful year working together. We are writing to let",
         "you know that our studio is moving to a larger space this summer. From",
         "August 1 our new address will be 210 Lighthouse Road, Norfolk, VA 23511.",
         "",
         "Nothing about your account changes, and your contact at the studio remains",
         "the same. We look forward to showing you the new print room.",
-        "", "Warm regards,", "", "Jamie Ortega", "Studio Manager",
+        "",
+        "Warm regards,",
+        "",
+        "Jamie Ortega",
+        "Studio Manager",
     ]
     for i, line in enumerate(lines):
         c.drawString(60, 705 - i * 15, line)

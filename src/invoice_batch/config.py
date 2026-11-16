@@ -31,8 +31,7 @@ def require_api_key() -> None:
     key = os.getenv("ANTHROPIC_API_KEY", "")
     if not key or key == _PLACEHOLDER_KEY:
         sys.exit(
-            "ANTHROPIC_API_KEY is not set.\n"
-            "  cp .env.example .env   then put your key in .env"
+            "ANTHROPIC_API_KEY is not set.\n  cp .env.example .env   then put your key in .env"
         )
 
 

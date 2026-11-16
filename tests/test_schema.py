@@ -7,8 +7,15 @@ from pydantic import ValidationError
 from invoice_batch.schema import EXTRACT_INVOICE_TOOL, TOOL_NAME, InvoiceExtraction
 
 SCHEMA = EXTRACT_INVOICE_TOOL["input_schema"]
-NULLABLE_FIELDS = ["invoice_no", "vendor", "customer_email", "issue_date",
-                   "due_date", "currency", "total"]
+NULLABLE_FIELDS = [
+    "invoice_no",
+    "vendor",
+    "customer_email",
+    "issue_date",
+    "due_date",
+    "currency",
+    "total",
+]
 
 
 def all_object_schemas(node):
@@ -25,11 +32,16 @@ def all_object_schemas(node):
 
 def valid_input(**overrides) -> dict:
     data = {
-        "is_invoice": True, "invoice_no": "INV-1", "vendor": "Acme",
-        "customer_email": "a@example.com", "issue_date": "2026-01-02",
-        "due_date": None, "currency": "USD",
+        "is_invoice": True,
+        "invoice_no": "INV-1",
+        "vendor": "Acme",
+        "customer_email": "a@example.com",
+        "issue_date": "2026-01-02",
+        "due_date": None,
+        "currency": "USD",
         "line_items": [{"description": "Widget", "quantity": 2, "unit_price": 5.5}],
-        "total": 11.0, "issues": [],
+        "total": 11.0,
+        "issues": [],
     }
     data.update(overrides)
     return data

@@ -11,8 +11,10 @@ from invoice_batch.synthetic.build import generate
 
 def main() -> None:
     docs = generate(DATA_DIR)
-    print(f"Wrote {len(docs)} documents to {(DATA_DIR / 'invoices').relative_to(PROJECT_ROOT)}/ "
-          f"and {(DATA_DIR / 'ground_truth.json').relative_to(PROJECT_ROOT)}\n")
+    print(
+        f"Wrote {len(docs)} documents to {(DATA_DIR / 'invoices').relative_to(PROJECT_ROOT)}/ "
+        f"and {(DATA_DIR / 'ground_truth.json').relative_to(PROJECT_ROOT)}\n"
+    )
     print(f"{'custom_id':<26} {'group':<14} {'expected_outcome':<16} {'size':>7}")
     print("-" * 66)
     for d in docs:

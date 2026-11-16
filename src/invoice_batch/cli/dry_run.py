@@ -51,12 +51,16 @@ def main() -> None:
                 print(json.dumps(block.model_dump(), indent=2, ensure_ascii=False))
             elif block.type == "text":
                 print(f"text: {block.text}")
-        print(f"usage: input={usage['input_tokens']} output={usage['output_tokens']} "
-              f"cache_write={usage.get('cache_creation_input_tokens')} "
-              f"cache_read={usage.get('cache_read_input_tokens')}")
+        print(
+            f"usage: input={usage['input_tokens']} output={usage['output_tokens']} "
+            f"cache_write={usage.get('cache_creation_input_tokens')} "
+            f"cache_read={usage.get('cache_read_input_tokens')}"
+        )
         print(f"cost (standard price): ${cost:.5f}\n")
-    print(f"Total dry-run cost at standard price: ${total:.5f} "
-          f"(a batch would be half: ${total / 2:.5f})")
+    print(
+        f"Total dry-run cost at standard price: ${total:.5f} "
+        f"(a batch would be half: ${total / 2:.5f})"
+    )
 
 
 if __name__ == "__main__":

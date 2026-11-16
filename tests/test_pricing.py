@@ -18,7 +18,9 @@ def test_batch_output_tokens_cost_half_the_standard_rate():
 
 def test_standard_price_is_double_the_batch_price():
     usage = {"input_tokens": 3000, "output_tokens": 400}
-    assert cost_usd(usage, HAIKU, batch=False) == pytest.approx(2 * cost_usd(usage, HAIKU, batch=True))
+    assert cost_usd(usage, HAIKU, batch=False) == pytest.approx(
+        2 * cost_usd(usage, HAIKU, batch=True)
+    )
 
 
 def test_cache_writes_and_reads_use_their_own_rates():

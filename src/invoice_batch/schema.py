@@ -27,14 +27,20 @@ EXTRACT_INVOICE_TOOL = {
         "properties": {
             "is_invoice": {
                 "type": "boolean",
-                "description": "true only if the document is an invoice or bill requesting payment.",
+                "description": (
+                    "true only if the document is an invoice or bill requesting payment."
+                ),
             },
             "invoice_no": _nullable("string", "Invoice number exactly as printed."),
             "vendor": _nullable("string", "Name of the business that issued the invoice."),
             "customer_email": _nullable("string", "Email address of the customer being billed."),
             "issue_date": _nullable("string", "Issue date as YYYY-MM-DD."),
-            "due_date": _nullable("string", "Payment due date as YYYY-MM-DD, or null if none is printed."),
-            "currency": _nullable("string", "ISO 4217 three-letter currency code, e.g. USD, EUR, GBP, CHF."),
+            "due_date": _nullable(
+                "string", "Payment due date as YYYY-MM-DD, or null if none is printed."
+            ),
+            "currency": _nullable(
+                "string", "ISO 4217 three-letter currency code, e.g. USD, EUR, GBP, CHF."
+            ),
             "line_items": {
                 "type": "array",
                 "description": "One entry per billed line, in document order. Empty if none.",
@@ -43,13 +49,18 @@ EXTRACT_INVOICE_TOOL = {
                     "properties": {
                         "description": {"type": "string"},
                         "quantity": {"type": "number"},
-                        "unit_price": {"type": "number", "description": "Price per unit as a plain number."},
+                        "unit_price": {
+                            "type": "number",
+                            "description": "Price per unit as a plain number.",
+                        },
                     },
                     "required": ["description", "quantity", "unit_price"],
                     "additionalProperties": False,
                 },
             },
-            "total": _nullable("number", "The total amount due exactly as printed, as a plain number."),
+            "total": _nullable(
+                "number", "The total amount due exactly as printed, as a plain number."
+            ),
             "issues": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -60,8 +71,16 @@ EXTRACT_INVOICE_TOOL = {
             },
         },
         "required": [
-            "is_invoice", "invoice_no", "vendor", "customer_email", "issue_date",
-            "due_date", "currency", "line_items", "total", "issues",
+            "is_invoice",
+            "invoice_no",
+            "vendor",
+            "customer_email",
+            "issue_date",
+            "due_date",
+            "currency",
+            "line_items",
+            "total",
+            "issues",
         ],
         "additionalProperties": False,
     },
@@ -86,4 +105,3 @@ class InvoiceExtraction(BaseModel):
     line_items: list[LineItem]
     total: float | None
     issues: list[str]
-

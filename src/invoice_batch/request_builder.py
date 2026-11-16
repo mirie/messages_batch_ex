@@ -12,8 +12,12 @@ from invoice_batch.schema import EXTRACT_INVOICE_TOOL, TOOL_NAME
 # Per the Tool use docs, these models return a 400 for forced tool_choice
 # ({"type": "tool"} or {"type": "any"}), including inside batches.
 NO_FORCED_TOOL_MODELS = {
-    "claude-opus-5-5", "claude-sonnet-5-5",
-    "claude-fable-5-1", "claude-fable-5-2", "claude-mythos-5-1", "claude-mythos-5-2",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-1",
+    "claude-fable-5-2",
+    "claude-mythos-5-1",
+    "claude-mythos-5-2",
 }
 
 MAX_TOKENS = 16000  # generous: thinking (on the auto path) also counts toward it
@@ -64,8 +68,10 @@ def tool_choice_for(model: str) -> dict:
 
 def pdf_block(path: Path) -> dict:
     data = base64.standard_b64encode(path.read_bytes()).decode("utf-8")
-    return {"type": "document",
-            "source": {"type": "base64", "media_type": "application/pdf", "data": data}}
+    return {
+        "type": "document",
+        "source": {"type": "base64", "media_type": "application/pdf", "data": data},
+    }
 
 
 def build_params(pdf_path: Path, model: str = MODEL, hint: str | None = None) -> dict:
@@ -85,26 +91,14 @@ def build_params(pdf_path: Path, model: str = MODEL, hint: str | None = None) ->
         "max_tokens": MAX_TOKENS,
         "system": [
             {
-                "type": "text", 
+                "type": "text",
                 "text": SYSTEM_PROMPT,
-                "cache_control": {
-                    "type": "ephemeral", 
-                    "ttl": "1h"
-                    }
+                "cache_control": {"type": "ephemeral", "ttl": "1h"},
             }
         ],
         "tools": [EXTRACT_INVOICE_TOOL],
         "tool_choice": tool_choice_for(model),
         "messages": [
-            {
-                "role": "user", 
-                "content": [
-                    pdf_block(pdf_path), 
-                    {
-                        "type": "text", 
-                        "text": text
-                    }
-                ]
-            }
+            {"role": "user", "content": [pdf_block(pdf_path), {"type": "text", "text": text}]}
         ],
     }

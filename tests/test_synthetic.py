@@ -19,7 +19,10 @@ def out_dir(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def docs(out_dir):
-    return {d["custom_id"]: d for d in json.loads((out_dir / "ground_truth.json").read_text())["documents"]}
+    return {
+        d["custom_id"]: d
+        for d in json.loads((out_dir / "ground_truth.json").read_text())["documents"]
+    }
 
 
 def test_writes_23_pdfs(out_dir):
@@ -37,8 +40,11 @@ def test_custom_ids_are_valid_for_the_batch_api(docs):
 
 def test_expected_outcome_counts_match_the_design(docs):
     assert Counter(d["expected_outcome"] for d in docs.values()) == {
-        "VALID": 16, "RETRY_ESCALATE": 1, "RETRY_WITH_HINT": 2,
-        "STABLE_ANSWER": 1, "NO_RETRY": 3,
+        "VALID": 16,
+        "RETRY_ESCALATE": 1,
+        "RETRY_WITH_HINT": 2,
+        "STABLE_ANSWER": 1,
+        "NO_RETRY": 3,
     }
 
 
@@ -70,8 +76,9 @@ def test_real_pdfs_start_with_the_pdf_header(out_dir):
 def test_generating_twice_gives_identical_ground_truth(tmp_path):
     generate(tmp_path / "a")
     generate(tmp_path / "b")
-    assert (tmp_path / "a" / "ground_truth.json").read_text() == \
-        (tmp_path / "b" / "ground_truth.json").read_text()
+    assert (tmp_path / "a" / "ground_truth.json").read_text() == (
+        tmp_path / "b" / "ground_truth.json"
+    ).read_text()
 
 
 def test_generating_twice_gives_byte_identical_pdfs(tmp_path):

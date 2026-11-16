@@ -34,7 +34,10 @@ def test_models_that_reject_forcing_get_auto(model):
 
 
 def test_document_block_comes_before_the_text(pdf):
-    assert [b["type"] for b in user_content(build_params(pdf, "claude-haiku-5-5"))] == ["document", "text"]
+    assert [b["type"] for b in user_content(build_params(pdf, "claude-haiku-5-5"))] == [
+        "document",
+        "text",
+    ]
 
 
 def test_pdf_is_base64_without_newlines_and_round_trips(pdf):
