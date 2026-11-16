@@ -9,13 +9,14 @@ you like. Two things worth knowing from the docs:
 - ended_at and results_url are null until processing_status is "ended".
 """
 
-import json
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import anthropic
+
+from invoice_batch.runs import BATCH_RECORD, iso, load_batch_record, write_json_atomic
 
 COUNT_FIELDS = ("processing", "succeeded", "errored", "canceled", "expired")
 
@@ -26,47 +27,6 @@ TRANSIENT_ERRORS = (
     anthropic.InternalServerError,  # any 5xx, including 529 overloaded
     anthropic.RateLimitError,
 )
-
-
-def resolve_batch(arg: str | None, runs_dir: Path) -> tuple[str, Path | None]:
-    """Turn the command-line argument into (batch_id, run folder or None).
-
-    None            -> the newest runs/*/batch.json (folders are timestamps)
-    a folder path   -> that folder's batch.json (returned as an absolute path)
-    a batch id      -> the run folder that recorded it, if there is one
-
-    Batch ids never contain "/", so an argument with a "/" (or one naming an
-    existing folder) is a path. A path without batch.json is an error, not a
-    batch id: a typo should say "not found", not send the path to the API.
-    """
-    records = sorted(runs_dir.glob("*/batch.json"))
-    if arg is None:
-        if not records:
-            raise SystemExit(f"No runs found in {runs_dir}. Submit one first: uv run submit-batch")
-        return _read_id(records[-1]), records[-1].parent
-
-    folder = Path(arg).resolve()
-    if (folder / "batch.json").is_file():
-        return _read_id(folder / "batch.json"), folder
-    if "/" in arg or folder.is_dir():
-        raise SystemExit(f"No batch.json in {arg}. Is the run folder name right? See {runs_dir}")
-
-    for record in records:
-        if _read_id(record) == arg:
-            return arg, record.parent
-    return arg, None
-
-
-def display_path(path: Path, base: Path) -> str:
-    """path relative to base when it is inside it, else the full path."""
-    try:
-        return str(path.resolve().relative_to(base.resolve()))
-    except ValueError:
-        return str(path)
-
-
-def _read_id(record: Path) -> str:
-    return json.loads(record.read_text())["batch_id"]
 
 
 def elapsed_text(delta: timedelta) -> str:
@@ -84,13 +44,12 @@ def update_batch_record(run_dir: Path, batch, checked_at: datetime) -> None:
     batch.json starts as a snapshot from submit time; everything else in it
     (ids, models, submit time) is kept as-is.
     """
-    path = run_dir / "batch.json"
-    record = json.loads(path.read_text())
+    record = load_batch_record(run_dir)
     record["processing_status"] = batch.processing_status
     record["request_counts"] = {name: getattr(batch.request_counts, name) for name in COUNT_FIELDS}
-    record["ended_at"] = batch.ended_at.isoformat() if batch.ended_at else None
-    record["last_checked_at"] = checked_at.isoformat()
-    path.write_text(json.dumps(record, indent=2) + "\n")
+    record["ended_at"] = iso(batch.ended_at)
+    record["last_checked_at"] = iso(checked_at)
+    write_json_atomic(run_dir / BATCH_RECORD, record)
 
 
 def utc_text(value: datetime) -> str:

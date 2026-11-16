@@ -28,6 +28,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from invoice_batch.pricing import cost_usd
+from invoice_batch.runs import write_text_atomic
 from invoice_batch.schema import parse_extraction
 
 BROKEN_STOP_REASONS = ("refusal", "max_tokens")
@@ -130,7 +131,7 @@ def total_cost(records: list[dict]) -> float:
 
 def write_results_jsonl(run_dir: Path, records: list[dict]) -> Path:
     path = run_dir / "results.jsonl"
-    path.write_text("".join(json.dumps(r) + "\n" for r in records))
+    write_text_atomic(path, "".join(json.dumps(r) + "\n" for r in records))
     return path
 
 

@@ -14,6 +14,7 @@ from pathlib import Path
 from invoice_batch.config import INVOICES_DIR, MODEL
 from invoice_batch.pricing import cost_usd
 from invoice_batch.request_builder import build_params
+from invoice_batch.runs import BATCH_RECORD, iso, write_json_atomic
 
 CUSTOM_ID_RE = re.compile(r"[a-zA-Z0-9_-]{1,64}")
 MAX_REQUESTS = 100_000
@@ -68,10 +69,6 @@ def submit(client, requests: list[dict]):
     return client.messages.batches.create(requests=requests)
 
 
-def _iso(value) -> str | None:
-    return value.isoformat() if isinstance(value, datetime) else value
-
-
 def write_batch_record(run_dir: Path, batch, requests: list[dict], submitted_at: datetime) -> Path:
     """Save what check/collect need later: the id, the times, and who was in it.
 
@@ -82,14 +79,14 @@ def write_batch_record(run_dir: Path, batch, requests: list[dict], submitted_at:
     record = {
         "batch_id": batch.id,
         "submitted_at": submitted_at.isoformat(),
-        "created_at": _iso(batch.created_at),
-        "expires_at": _iso(batch.expires_at),
+        "created_at": iso(batch.created_at),
+        "expires_at": iso(batch.expires_at),
         "processing_status": batch.processing_status,
         "custom_ids": [r["custom_id"] for r in requests],
         "models": {r["custom_id"]: r["params"]["model"] for r in requests},
     }
-    path = run_dir / "batch.json"
-    path.write_text(json.dumps(record, indent=2) + "\n")
+    path = run_dir / BATCH_RECORD
+    write_json_atomic(path, record)
     return path
 
 

@@ -1,7 +1,7 @@
 """Stage 6: download a finished batch's results and save one record per document.
 
 Run:  uv run collect-results                       newest run in runs/
-      uv run collect-results runs/20261116-011243  a specific run folder
+      uv run collect-results 20261116-011243       a specific run folder (or runs/...)
 
 Downloading results is free. It only works once processing_status is "ended";
 before that there is nothing to download. Writes results.jsonl next to
@@ -9,11 +9,11 @@ batch.json, sorted by custom_id (the API returns results in any order).
 """
 
 import argparse
-import json
 
 from invoice_batch.config import RUNS_DIR, make_client
 from invoice_batch.results import collect, total_cost, write_results_jsonl
-from invoice_batch.status import display_path, elapsed_text, resolve_batch, utc_text
+from invoice_batch.runs import add_batch_argument, display_path, load_batch_record, resolve_batch
+from invoice_batch.status import elapsed_text, utc_text
 
 
 def _usage_text(usage: dict) -> str:
@@ -61,13 +61,13 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="collect-results", description="Download a finished batch's results (free)."
     )
-    parser.add_argument("batch", nargs="?", help="run folder or batch id (default: newest run)")
+    add_batch_argument(parser)
     args = parser.parse_args(argv)
 
     batch_id, run_dir = resolve_batch(args.batch, RUNS_DIR)
     if run_dir is None:
         raise SystemExit(f"No run folder records {batch_id}; results.jsonl needs one.")
-    expected = json.loads((run_dir / "batch.json").read_text()).get("custom_ids", [])
+    expected = load_batch_record(run_dir).get("custom_ids", [])
 
     client = make_client()
     batch = client.messages.batches.retrieve(batch_id)

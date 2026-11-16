@@ -21,6 +21,7 @@ from invoice_batch.batch import (
     write_batch_record,
 )
 from invoice_batch.config import ESCALATION_MODEL, INVOICES_DIR, MODEL, RUNS_DIR, make_client
+from invoice_batch.runs import display_path
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -59,13 +60,14 @@ def main(argv: list[str] | None = None) -> None:
     client = make_client()
     submitted_at = datetime.now(UTC)
     batch = submit(client, requests)
+    # Print the id first: the batch is live and billable now, even if saving fails.
+    print(f"\nSubmitted batch {batch.id}", flush=True)
     run_dir = RUNS_DIR / submitted_at.strftime("%Y%m%d-%H%M%S")
     path = write_batch_record(run_dir, batch, requests, submitted_at)
 
-    print(f"\nSubmitted batch {batch.id}")
     print(f"  processing_status: {batch.processing_status}")
     print(f"  created_at: {batch.created_at}   expires_at: {batch.expires_at}")
-    print(f"  saved: {path.relative_to(RUNS_DIR.parent)}")
+    print(f"  saved: {display_path(path, RUNS_DIR.parent)}")
     print("Next: uv run check-batch")
 
 

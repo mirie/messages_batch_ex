@@ -47,6 +47,10 @@ Each stage is a command registered in `pyproject.toml` under `[project.scripts]`
 | 2 | `uv run show-schema` | No. Prints the invoice JSON schema |
 | 3 | `uv run dry-run` | Yes, 4 synchronous requests (well under $0.01) |
 | 4 | `uv run submit-batch` | Only with `--yes`. Without it, prints the plan and a cost estimate |
+| 5 | `uv run check-batch [--watch]` | Yes, but free (status only). Updates `batch.json` |
+| 6 | `uv run collect-results` | Yes, but free (downloads results). Writes `results.jsonl` |
+
+`check-batch` and `collect-results` use the newest run by default. You can also pass a run folder (`runs/20261116-011243` or just `20261116-011243`) or a batch id.
 
 ## Test
 
@@ -126,6 +130,9 @@ src/invoice_batch/
 ├── request_builder.py   system prompt, build_params()
 ├── batch.py             build_requests(), check_limits(), submit(), estimate_batch_cost()
 ├── pricing.py           PRICES, cost_usd() (standard vs. batch)
+├── runs.py              run folders: resolve_batch(), batch.json, atomic file writes
+├── status.py            describe(), watch(), update_batch_record()
+├── results.py           record_from_result(), collect(), results.jsonl
 ├── synthetic/           the fake test set
 │   ├── data.py          vendors, customers, make_invoice(), truth_of()
 │   ├── layouts.py       classic, modern, compact, cluttered, letter pages
@@ -134,7 +141,9 @@ src/invoice_batch/
     ├── generate_invoices.py
     ├── show_schema.py
     ├── dry_run.py
-    └── submit_batch.py
+    ├── submit_batch.py
+    ├── check_batch.py
+    └── collect_results.py
 tests/                   pytest, one file per library module
 ```
 

@@ -1,80 +1,17 @@
-"""Stage 5: finding the batch to check, describing its status, and polling it."""
+"""Stage 5: describing a batch's status, polling it, and saving it to batch.json."""
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import pytest
-from fakes import FakeClock, batch_status, fake_status_client
+from fakes import CREATED, FakeClock, batch_status, fake_status_client
 
 from invoice_batch.status import (
     describe,
-    display_path,
     elapsed_text,
-    resolve_batch,
+    update_batch_record,
     watch,
 )
-
-CREATED = datetime(2026, 11, 16, 1, 12, 44, tzinfo=UTC)
-
-
-def _write_run(runs_dir, name, batch_id):
-    run = runs_dir / name
-    run.mkdir(parents=True)
-    (run / "batch.json").write_text(json.dumps({"batch_id": batch_id}))
-    return run
-
-
-# --- resolve_batch: which batch are we checking? -------------------------------
-
-
-def test_default_is_the_newest_run_folder(tmp_path):
-    _write_run(tmp_path, "20261115-090000", "msgbatch_old")
-    newest = _write_run(tmp_path, "20261116-011243", "msgbatch_new")
-    assert resolve_batch(None, tmp_path) == ("msgbatch_new", newest)
-
-
-def test_a_run_folder_argument_uses_that_folder(tmp_path):
-    old = _write_run(tmp_path, "20261115-090000", "msgbatch_old")
-    _write_run(tmp_path, "20261116-011243", "msgbatch_new")
-    assert resolve_batch(str(old), tmp_path) == ("msgbatch_old", old)
-
-
-def test_a_batch_id_argument_finds_its_run_folder(tmp_path):
-    old = _write_run(tmp_path, "20261115-090000", "msgbatch_old")
-    _write_run(tmp_path, "20261116-011243", "msgbatch_new")
-    assert resolve_batch("msgbatch_old", tmp_path) == ("msgbatch_old", old)
-
-
-def test_an_unknown_batch_id_is_still_checked_without_a_folder(tmp_path):
-    assert resolve_batch("msgbatch_elsewhere", tmp_path) == ("msgbatch_elsewhere", None)
-
-
-def test_a_relative_run_folder_comes_back_absolute(tmp_path, monkeypatch):
-    run = _write_run(tmp_path / "runs", "20261116-011243", "msgbatch_new")
-    monkeypatch.chdir(tmp_path)
-    batch_id, folder = resolve_batch("runs/20261116-011243", tmp_path / "runs")
-    assert batch_id == "msgbatch_new"
-    assert folder.is_absolute()
-    assert folder == run.resolve()
-
-
-@pytest.mark.parametrize("arg", ["runs/2026111-011243", "runs/20261116-011243/"])
-def test_a_path_without_batch_json_is_a_clear_error_not_a_batch_id(tmp_path, monkeypatch, arg):
-    (tmp_path / "runs" / "20261116-011243").mkdir(parents=True)  # exists, but no batch.json
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(SystemExit, match="batch.json"):
-        resolve_batch(arg, tmp_path / "runs")
-
-
-def test_display_path_is_relative_to_the_project_when_it_can_be(tmp_path):
-    assert display_path(tmp_path / "runs" / "x", tmp_path) == "runs/x"
-    assert display_path(tmp_path / "x", tmp_path / "elsewhere") == str(tmp_path / "x")
-
-
-def test_no_runs_at_all_is_a_clear_error(tmp_path):
-    with pytest.raises(SystemExit, match="submit-batch"):
-        resolve_batch(None, tmp_path)
-
 
 # --- elapsed_text --------------------------------------------------------------
 
@@ -202,8 +139,6 @@ def test_watch_does_not_retry_errors_that_are_not_transient():
 
 
 def test_update_batch_record_writes_the_latest_status_and_keeps_everything_else(tmp_path):
-    from invoice_batch.status import update_batch_record
-
     run = tmp_path / "run"
     run.mkdir()
     original = {
@@ -227,8 +162,6 @@ def test_update_batch_record_writes_the_latest_status_and_keeps_everything_else(
 
 
 def test_update_batch_record_leaves_ended_at_null_while_running(tmp_path):
-    from invoice_batch.status import update_batch_record
-
     run = tmp_path / "run"
     run.mkdir()
     (run / "batch.json").write_text(json.dumps({"batch_id": "msgbatch_x"}))

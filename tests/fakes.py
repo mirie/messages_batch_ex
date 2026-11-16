@@ -1,9 +1,33 @@
 """Test doubles shared by several test files. Nothing here calls the API."""
 
-from datetime import UTC, datetime
+import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 FAKE_PDF = b"%PDF-1.4 fake\n" * 20
+CREATED = datetime(2026, 11, 16, 1, 12, 44, tzinfo=UTC)
+
+# A valid extraction, as InvoiceExtraction.model_dump() would give it.
+GOOD_EXTRACTION = {
+    "is_invoice": True,
+    "invoice_no": "INV-1001",
+    "vendor": "Acme",
+    "customer_email": "a@b.test",
+    "issue_date": "2026-01-02",
+    "due_date": "2026-02-01",
+    "currency": "USD",
+    "line_items": [{"description": "Widget", "quantity": 2, "unit_price": 5.0}],
+    "total": 10.0,
+    "issues": [],
+}
+
+
+def make_run(runs_dir, name="20261116-011243", batch_id="msgbatch_real", **record):
+    """A run folder holding a batch.json with batch_id plus any extra fields."""
+    run = runs_dir / name
+    run.mkdir(parents=True)
+    (run / "batch.json").write_text(json.dumps({"batch_id": batch_id, **record}))
+    return run
 
 
 class FakeBatches:
@@ -91,8 +115,6 @@ class FakeClock:
 
     def sleep(self, seconds):
         self.slept.append(seconds)
-        from datetime import timedelta
-
         self.current += timedelta(seconds=seconds)
 
 

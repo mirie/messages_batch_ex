@@ -45,3 +45,15 @@ def test_with_yes_it_submits_and_writes_batch_json(setup, capsys):
     (record_path,) = (tmp_path / "runs").glob("*/batch.json")
     assert json.loads(record_path.read_text())["batch_id"] == "msgbatch_fake123"
     assert "msgbatch_fake123" in capsys.readouterr().out
+
+
+def test_the_batch_id_is_printed_even_if_saving_batch_json_fails(setup, monkeypatch, capsys):
+    # The batch is already submitted (and will be billed) by then, so the id
+    # must reach the screen before anything else can go wrong.
+    def broken_write(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(submit_batch, "write_batch_record", broken_write)
+    with pytest.raises(OSError):
+        submit_batch.main(["--yes"])
+    assert "msgbatch_fake123" in capsys.readouterr().out
