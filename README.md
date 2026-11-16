@@ -4,7 +4,7 @@ A small Python learning project that extracts fields from fake PDF invoices with
 
 This is a self-directed experiment. It uses 23 generated invoices, some clean and some deliberately broken, to show what the Batches API does with tool calls, timing, cost, retries, and failures.
 
-Status: stages 1–4 are built (test data, JSON schema, synchronous dry run, batch submit). Batch stages are added one at a time.
+Status: stages 1–7 are built (test data, JSON schema, synchronous dry run, batch submit, status, results, triage). Batch stages are added one at a time.
 
 ## Setup
 
@@ -49,8 +49,9 @@ Each stage is a command registered in `pyproject.toml` under `[project.scripts]`
 | 4 | `uv run submit-batch` | Only with `--yes`. Without it, prints the plan and a cost estimate |
 | 5 | `uv run check-batch [--watch]` | Yes, but free (status only). Updates `batch.json` |
 | 6 | `uv run collect-results` | Yes, but free (downloads results). Writes `results.jsonl` |
+| 7 | `uv run triage` | No. Writes `triage.json` and prints predicted vs. actual |
 
-`check-batch` and `collect-results` use the newest run by default. You can also pass a run folder (`runs/20261116-011243` or just `20261116-011243`) or a batch id.
+`check-batch`, `collect-results` and `triage` use the newest run by default. You can also pass a run folder (`runs/20261116-011243` or just `20261116-011243`) or a batch id.
 
 ## Test
 
@@ -133,6 +134,8 @@ src/invoice_batch/
 ├── runs.py              run folders: resolve_batch(), batch.json, atomic file writes
 ├── status.py            describe(), watch(), update_batch_record()
 ├── results.py           record_from_result(), collect(), results.jsonl
+├── triage.py            the failure policy: check_extraction(), triage_one(), triage_run()
+├── compare.py           learning only: truth_diffs(), expected/prediction verdicts
 ├── synthetic/           the fake test set
 │   ├── data.py          vendors, customers, make_invoice(), truth_of()
 │   ├── layouts.py       classic, modern, compact, cluttered, letter pages
@@ -143,7 +146,8 @@ src/invoice_batch/
     ├── dry_run.py
     ├── submit_batch.py
     ├── check_batch.py
-    └── collect_results.py
+    ├── collect_results.py
+    └── triage.py
 tests/                   pytest, one file per library module
 ```
 

@@ -19,6 +19,7 @@ dry-run = "invoice_batch.cli.dry_run:main"
 submit-batch = "invoice_batch.cli.submit_batch:main"
 check-batch = "invoice_batch.cli.check_batch:main"
 collect-results = "invoice_batch.cli.collect_results:main"
+triage = "invoice_batch.cli.triage:main"
 
 [dependency-groups]
 dev = [
