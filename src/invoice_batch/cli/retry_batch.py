@@ -1,13 +1,17 @@
-"""Submit one retry round: only the documents triage marked as retryable.
+"""Submit a retry round with only the documents that triage marked for retry.
 
 Run:  uv run retry-batch                         plan for the newest run (free)
       uv run retry-batch 20261116-040415         plan for a specific run folder
       uv run retry-batch --yes                   actually submit (costs money)
 
-Reads the run's triage.json and sends RETRY_WITH_HINT with a hint built from
-the failed checks, RETRY_SAME unchanged, and RETRY_ESCALATE on the escalation
-model. The new batch gets its own run folder, and its batch.json records the
-round and the parent run, so triage there can see the earlier attempts.
+It reads the run's triage.json and sends each document in a RETRY class:
+
+- RETRY_WITH_HINT goes to the normal model, with a hint that names the problems.
+- RETRY_SAME is sent again exactly as before.
+- RETRY_ESCALATE goes to the escalation model, with the same kind of hint.
+
+The new batch gets its own run folder. Its batch.json records the round number
+and the run it retries, so triage can find the earlier attempts later.
 """
 
 import argparse
@@ -30,7 +34,10 @@ from invoice_batch.triage import ATTEMPT_LIMIT
 
 
 def _estimate(plan: list[dict]) -> dict[str, float]:
-    """Typical and worst cost of this round, summed per model (each model has its own cache)."""
+    """Return the typical and worst-case cost of this round.
+
+    Each model has its own cache, so the estimate is made per model and then added up.
+    """
     per_model = Counter(retry["model"] for retry in plan)
     totals = {"typical": 0.0, "worst": 0.0}
     for model, n in per_model.items():

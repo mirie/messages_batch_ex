@@ -1,14 +1,16 @@
-"""Plan the next round from a triage, and read a document's earlier attempts.
+"""Decide what to send in a retry round, and find each document's earlier attempts.
 
-A retry round is a new batch in a new run folder whose batch.json points back
-at the run it retries (`parent_run`). Following those links gives each
-document's attempt history, which triage needs for STABLE_ANSWER,
-RETRY_ESCALATE and MAX_ATTEMPTS.
+Each retry round is a new batch with its own run folder. Its batch.json has a
+`parent_run` field that names the run it retries. By following these links
+back to round 1, we can collect every earlier attempt for a document. Triage
+needs those attempts to tell whether a retry gave the same answer again.
+
+How each retry class is sent:
 
     class            model                       hint
-    RETRY_WITH_HINT  MODEL                       from this attempt's problems
+    RETRY_WITH_HINT  MODEL                       the problems triage found
     RETRY_SAME       same as the previous try    same as the previous try
-    RETRY_ESCALATE   ESCALATION_MODEL            from this attempt's problems
+    RETRY_ESCALATE   ESCALATION_MODEL            the problems triage found
 """
 
 import json
@@ -21,7 +23,7 @@ from invoice_batch.triage import RETRY_ESCALATE, RETRY_SAME, RETRY_WITH_HINT
 
 
 def hint_for(problems: list[str]) -> str | None:
-    """The check failures as one sentence, or None if there are none."""
+    """Join the problems into one sentence. Return None if there are no problems."""
     return "; ".join(problems) + "." if problems else None
 
 
@@ -31,10 +33,13 @@ def plan_retries(
     model: str = MODEL,
     escalation_model: str = ESCALATION_MODEL,
 ) -> list[dict]:
-    """One {custom_id, class, model, hint} per retryable document, in triage order.
+    """Return one plan entry for each document that should be retried.
 
-    parent_record is the batch.json of the run that was triaged; RETRY_SAME
-    reads the model and hint it used.
+    Each entry is a dict with custom_id, class, model and hint. Documents in
+    other classes are skipped.
+
+    parent_record is the batch.json of the run that was triaged. A RETRY_SAME
+    document is sent again with the same model and hint it had in that run.
     """
     previous_models = parent_record.get("models", {})
     previous_hints = parent_record.get("hints", {})
@@ -60,11 +65,14 @@ def plan_retries(
 
 
 def load_histories(run_dir: Path, runs_dir: Path) -> dict[str, list[dict]]:
-    """Earlier results.jsonl records for each of this run's documents, oldest first.
+    """Return the earlier attempts for each document in this run, oldest first.
 
-    Walks batch.json's parent_run links back to round 1. Documents with no
-    earlier attempt are left out. A broken link stops with an error, because a
-    missing attempt would make triage count attempts wrong.
+    The result maps a custom_id to a list of results.jsonl records from earlier
+    rounds. It finds them by following parent_run from this run back to round 1.
+    A document with no earlier attempts is not in the result.
+
+    If a parent run or its results.jsonl is missing, this stops with an error.
+    Without it, triage would count the attempts wrong.
     """
     custom_ids = set(load_batch_record(run_dir).get("custom_ids", []))
     ancestors = []  # nearest parent first
@@ -85,14 +93,14 @@ def load_histories(run_dir: Path, runs_dir: Path) -> dict[str, list[dict]]:
 
     histories: dict[str, list[dict]] = {}
     for results in reversed(ancestors):  # oldest first
-        for rec in read_results_jsonl(results):
-            if rec.get("custom_id") in custom_ids:
-                histories.setdefault(rec["custom_id"], []).append(rec)
+        for record in read_results_jsonl(results):
+            if record.get("custom_id") in custom_ids:
+                histories.setdefault(record["custom_id"], []).append(record)
     return histories
 
 
 def child_runs(run_dir: Path, runs_dir: Path) -> list[Path]:
-    """Run folders whose batch.json names run_dir as its parent_run."""
+    """Return the run folders that retry run_dir (their parent_run is run_dir)."""
     children = []
     for record in sorted(runs_dir.glob(f"*/{BATCH_RECORD}")):
         try:

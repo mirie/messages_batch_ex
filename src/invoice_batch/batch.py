@@ -35,10 +35,11 @@ def build_requests(
     pdf_dir: Path = INVOICES_DIR,
     models: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Build one request per document, in the order of custom_ids.
+    """Build one request per document, in the same order as custom_ids.
 
-    `hints` maps a custom_id to its retry hint and `models` to a model other
-    than `model`; documents not in them get the plain prompt and `model`.
+    Every document uses `model` and the plain prompt, with two exceptions.
+    If a document's custom_id is in `models`, it uses that model instead.
+    If it is in `hints`, the hint is added to its prompt.
     """
     hints = hints or {}
     models = models or {}
@@ -83,8 +84,8 @@ def write_batch_record(
     extra: dict | None = None,
 ) -> Path:
     """Save what check-batch and collect-results need: the batch id, the times,
-    and each document's id and model. `extra` adds fields such as a retry
-    round's round, parent_run and hints.
+    and each document's id and model. Anything in `extra` is saved too. A
+    retry round uses it for round, parent_run and hints.
 
     The request bodies are left out: the base64 PDFs are large and can be
     rebuilt from data/.
