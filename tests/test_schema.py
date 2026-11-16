@@ -92,7 +92,7 @@ def pydantic_shape() -> dict:
     return shape(schema, schema.get("$defs", {}))
 
 
-def test_pydantic_model_matches_the_tool_schema_field_by_field():
+def test_pydantic_model_matches_the_output_schema_field_by_field():
     # Same field names, same JSON types, same nullability, same required
     # fields, all the way down into line_items.
     assert shape(SCHEMA, {}) == pydantic_shape()

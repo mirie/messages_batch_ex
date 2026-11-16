@@ -1,9 +1,12 @@
-"""The invoice JSON schema: the shape of the data extracted from invoice PDF files.
+"""The invoice schema (sent as output_config.format) and its Pydantic twin.
 
-Nullable fields ("type": ["string", "null"]) let Claude say "not on the page"
-instead of inventing a value. Sent as output_config.format, it makes the API
-guarantee Claude's reply is JSON matching this schema exactly (right keys,
-right types).
+Structured outputs require every field to be listed in `required`, so a value
+that isn't on the page comes back as null rather than as a missing key. That
+also gives Claude a way out instead of inventing a value.
+
+The API guarantees the reply matches the schema, except after a refusal or
+max_tokens stop. So replies are still validated with InvoiceExtraction, and
+tests keep the two definitions in sync.
 """
 
 from pydantic import BaseModel
@@ -97,11 +100,10 @@ class InvoiceExtraction(BaseModel):
 
 
 def parse_extraction(content: list) -> InvoiceExtraction:
-    """Read Claude's reply: the JSON is in the text block.
+    """Validate the JSON-outputs reply as an InvoiceExtraction.
 
-    The content may start with thinking blocks (Haiku and Sonnet 5.5 think by
-    default), so look for the text block rather than taking content[0].
-    Blocks may be SDK objects or plain dicts (as saved from batch results).
+    Searches for the text block because a thinking block usually comes first.
+    Takes SDK blocks (dry-run) or plain dicts (results.jsonl).
     """
     blocks = [
         b if isinstance(b, dict) else {"type": b.type, "text": getattr(b, "text", None)}

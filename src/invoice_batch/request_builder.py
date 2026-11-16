@@ -78,7 +78,7 @@ def build_params(pdf_path: Path, model: str = MODEL, hint: str | None = None) ->
             }
         ],
         # Adaptive: the model decides whether a document is worth thinking about
-        # (the letter usually gets none). Summarized: return a readable summary
+        # (non-invoices usually get none). Summarized: return a readable summary
         # instead of an empty thinking block. Billing is the same either way.
         "thinking": {"type": "adaptive", "display": "summarized"},
         "output_config": {"format": OUTPUT_FORMAT},
