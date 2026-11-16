@@ -27,7 +27,7 @@ from invoice_batch.runs import (
     resolve_batch,
     write_json_atomic,
 )
-from invoice_batch.triage import CLASSES, triage_run
+from invoice_batch.triage import CLASSES, RETRY_CLASSES, triage_run
 
 
 def _read_optional_json(path: Path):
@@ -134,7 +134,10 @@ def main(argv: list[str] | None = None) -> None:
         print_value_check(decisions, {r["custom_id"]: r for r in records}, truth_docs)
 
     print(f"\nsaved: {display_path(path, RUNS_DIR.parent)}")
-    print("Next: uv run retry-batch")
+    if any(decision["class"] in RETRY_CLASSES for decision in decisions):
+        print("Next: uv run retry-batch")
+    else:
+        print("Nothing left to retry: every document is VALID or goes to human review.")
 
 
 if __name__ == "__main__":

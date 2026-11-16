@@ -125,3 +125,24 @@ def test_a_retry_round_uses_the_parent_runs_results_as_history(tmp_path, monkeyp
     (doc,) = saved["documents"]
     assert (doc["class"], doc["attempt"]) == ("STABLE_ANSWER", 2)
     assert saved["round"] == 2
+
+
+def test_it_suggests_retry_batch_when_something_can_be_retried(run, capsys):
+    triage.main([])  # 20_total_mismatch is RETRY_WITH_HINT on round 1
+    assert "Next: uv run retry-batch" in capsys.readouterr().out
+
+
+def test_it_says_nothing_is_left_to_retry_when_no_retry_class_remains(
+    tmp_path, monkeypatch, capsys
+):
+    runs = tmp_path / "runs"
+    monkeypatch.setattr(triage, "RUNS_DIR", runs)
+    monkeypatch.setattr(triage, "GROUND_TRUTH", tmp_path / "none.json")
+    folder = make_run(runs, custom_ids=["01_clean"])
+    (folder / "results.jsonl").write_text(json.dumps(_record("01_clean")) + "\n")
+
+    triage.main([])
+
+    out = capsys.readouterr().out
+    assert "retry-batch" not in out
+    assert "Nothing left to retry" in out
