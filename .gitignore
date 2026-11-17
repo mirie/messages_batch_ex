@@ -7,4 +7,5 @@ __pycache__/
 runs/
 data/
 docs/
-CLAUDE.md.DS_Store
+CLAUDE.md
+.DS_Store
