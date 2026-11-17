@@ -80,15 +80,15 @@ The tests never call the API. They cover the invoice JSON schema (generated from
 | `21_corrupt` | Random bytes named `.pdf` | `NO_RETRY` |
 | `22_letter` | A change-of-address letter | `NO_RETRY` |
 | `23_blank` | A blank page | `NO_RETRY` |
-| `24_degraded_scan` | Image-only, blurry, tilted scan. Line items use the easily confused digits 3/8, 1/7, 5/6, and the total is large and clear | `RETRY_ESCALATE` |
-| `25_handwritten_correction` | Image-only scan. A quantity is crossed out and rewritten by hand, and the total uses the new value | `RETRY_WITH_HINT` |
-| `26_illegible_scan` | Image-only fax-quality scan with a stain over a price | `MAX_ATTEMPTS` |
+| `24_degraded_scan` | Image-only, blurry, tilted scan. Line items use the easily confused digits 3/8, 1/7, 5/6, and the total is large and clear. In dry-runs both Haiku and Sonnet misread 38.83 | `MAX_ATTEMPTS` |
+| `25_handwritten_correction` | Image-only scan. A quantity is crossed out and rewritten by hand, and the total uses the new value. A control: Haiku reads it correctly | `VALID` |
+| `26_fax_scan` | Image-only black-and-white fax scan with a stain over a price; the price can be worked out from the total | `RETRY_ESCALATE` |
 
 `ground_truth.json` stores the true field values and the expected outcome for each document, so predictions can be compared with what actually happens.
 
 Claude receives each PDF page as an image **and** as its extracted text. Small grey print is therefore still easy to read through the text layer. That is why `17_cluttered` puts its decoy digits into the text layer as well, not just into the picture.
 
-Documents 24–26 have **no text layer at all**: each page is a single picture (drawn with Pillow, then shrunk, tilted, blurred and speckled like a cheap scan). Claude has only the image to read. Each source invoice adds up, so a misread line item breaks the sum check, which triage can see. Their expected outcomes are design goals; try them one at a time with `uv run dry-run 24_degraded_scan` before batching.
+Documents 24–26 have **no text layer at all**: each page is a single picture (drawn with Pillow, then shrunk, tilted, blurred and speckled like a cheap scan). Claude has only the image to read. Each source invoice adds up, so a misread line item breaks the sum check, which triage can see. Their expected outcomes are design goals, adjusted after dry-runs. Try one at a time with `uv run dry-run 24_degraded_scan`, and tune them in `SCAN_SETTINGS` in `synthetic/build.py`. Each scan has its own random seed, so tuning one never changes another.
 
 ```text
 draw page sharply  -->  make it look scanned               -->  PDF with one image

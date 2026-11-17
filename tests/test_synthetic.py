@@ -7,7 +7,7 @@ from collections import Counter
 import pytest
 from pypdf import PdfReader
 
-from invoice_batch.synthetic.build import generate
+from invoice_batch.synthetic.build import SCAN_SETTINGS, generate
 from invoice_batch.synthetic.data import items_total
 
 
@@ -26,7 +26,7 @@ def docs(out_dir):
     }
 
 
-IMAGE_ONLY = ["24_degraded_scan", "25_handwritten_correction", "26_illegible_scan"]
+IMAGE_ONLY = ["24_degraded_scan", "25_handwritten_correction", "26_fax_scan"]
 
 
 def test_writes_26_pdfs(out_dir):
@@ -44,9 +44,9 @@ def test_custom_ids_are_valid_for_the_batch_api(docs):
 
 def test_expected_outcome_counts_match_the_design(docs):
     assert Counter(d["expected_outcome"] for d in docs.values()) == {
-        "VALID": 16,
+        "VALID": 17,
         "RETRY_ESCALATE": 2,
-        "RETRY_WITH_HINT": 3,
+        "RETRY_WITH_HINT": 2,
         "STABLE_ANSWER": 1,
         "MAX_ATTEMPTS": 1,
         "NO_RETRY": 3,
@@ -128,3 +128,22 @@ def test_handwritten_correction_breaks_the_sum_if_misread(docs):
     misread_items = [dict(item) for item in document["truth"]["line_items"]]
     misread_items[correction["line_index"]]["quantity"] = correction["crossed_out_quantity"]
     assert items_total(misread_items) != pytest.approx(document["truth"]["total"])
+
+
+def test_tuning_one_scan_does_not_change_the_other_scans(tmp_path, monkeypatch):
+    """Check that each scanned document has its own random numbers.
+
+    Otherwise a lower scan resolution on 24 would use fewer random bytes for
+    its grain and silently change every value drawn for 25 and 26.
+    """
+    generate(tmp_path / "before")
+    lower_resolution = SCAN_SETTINGS["24_degraded_scan"] | {"scan_dpi": 60}
+    monkeypatch.setitem(SCAN_SETTINGS, "24_degraded_scan", lower_resolution)
+    generate(tmp_path / "after")
+
+    def pdf_bytes(folder, custom_id):
+        return (tmp_path / folder / "invoices" / f"{custom_id}.pdf").read_bytes()
+
+    assert pdf_bytes("before", "24_degraded_scan") != pdf_bytes("after", "24_degraded_scan")
+    for custom_id in ["25_handwritten_correction", "26_fax_scan"]:
+        assert pdf_bytes("before", custom_id) == pdf_bytes("after", custom_id), custom_id

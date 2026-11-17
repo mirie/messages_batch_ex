@@ -11,7 +11,7 @@ Documents (custom_id = filename stem):
   23     a blank page
   24     image-only degraded scan with easily confused digits in the line items
   25     image-only scan with a quantity crossed out and rewritten by hand
-  26     image-only fax-quality scan with a stain over a price
+  26     image-only black-and-white fax scan with a stain over a price
 """
 
 import json
@@ -205,6 +205,26 @@ def generate(out_dir: Path, seed: int = 42) -> list[dict]:
     return docs
 
 
+# How badly each scanned document is degraded. These are the knobs to turn
+# after a dry-run. See make_scanned() in scan.py for what each one does.
+SCAN_SETTINGS = {
+    "24_degraded_scan": {"scan_dpi": 80, "tilt_degrees": 1.2, "blur_radius": 0.9, "noise": 0.2},
+    "25_handwritten_correction": {
+        "scan_dpi": 150,
+        "tilt_degrees": 0.5,
+        "blur_radius": 0.4,
+        "noise": 0.08,
+    },
+    "26_fax_scan": {
+        "scan_dpi": 100,
+        "tilt_degrees": 1.5,
+        "blur_radius": 0.6,
+        "noise": 0.15,
+        "threshold": 170,
+    },
+}
+
+
 def _with_items(inv: dict, items: list[tuple[str, int, float]]) -> dict:
     """Replace the invoice's line items with fixed ones and recompute its total."""
     inv["line_items"] = [
@@ -215,17 +235,28 @@ def _with_items(inv: dict, items: list[tuple[str, int, float]]) -> dict:
     return inv
 
 
-def _add_scanned_documents(rng, invoices_dir: Path, add) -> None:
+def _add_scanned_documents(rng: random.Random, invoices_dir: Path, add) -> None:
     """Build documents 24-26: image-only scans with no text layer for Claude to fall back on.
 
     Each source invoice is self-consistent: its line items add up to its total.
     A misread line item therefore breaks the sum check, which triage can see.
+
+    The shared generator gives each document one seed, drawn up front in a fixed
+    order. Each document then makes its own random numbers from that seed, so
+    tuning one document in SCAN_SETTINGS never changes another.
     """
+    seeds = {custom_id: rng.getrandbits(64) for custom_id in SCAN_SETTINGS}
+
+    def scan_and_save(custom_id: str, page: ScanPage, doc_rng: random.Random) -> None:
+        scan = make_scanned(page, doc_rng, **SCAN_SETTINGS[custom_id])
+        save_image_pdf(invoices_dir / f"{custom_id}.pdf", custom_id, scan)
+
     # 24: a poor scan, with easily confused digits (3/8, 1/7, 5/6) in small
     # line items and a large, bold total that stays readable. There is no
     # line-amount column, so a misread price cannot be checked against its row.
+    doc_rng = random.Random(seeds["24_degraded_scan"])
     inv24 = _with_items(
-        make_invoice(rng, 24, currency="USD"),
+        make_invoice(doc_rng, 24, currency="USD"),
         [
             ("Toner cartridge, black", 3, 38.83),
             ("Spiral notebooks (10-pack)", 7, 17.71),
@@ -234,22 +265,24 @@ def _add_scanned_documents(rng, invoices_dir: Path, add) -> None:
     )
     page = ScanPage()
     draw_scanned_invoice(page, inv24, item_size=8, total_size=15, show_amounts=False)
-    scan = make_scanned(page, rng, scan_dpi=80, tilt_degrees=1.2, blur_radius=0.9, noise=0.2)
-    save_image_pdf(invoices_dir / "24_degraded_scan.pdf", "24_degraded_scan", scan)
+    scan_and_save("24_degraded_scan", page, doc_rng)
     add(
         "24_degraded_scan",
         "hard",
         "scan",
-        "RETRY_ESCALATE",
+        "MAX_ATTEMPTS",
         "Image-only, low-resolution, blurred and tilted scan. Small line items use the "
         "easily confused digits 3/8, 1/7 and 5/6, while the total is large and clear, so "
-        "a misread breaks the sum. Expected to survive a hint and need the bigger model.",
+        "a misread breaks the sum. In dry-runs Haiku read 38.83 as 30.63 and Sonnet read "
+        "it as 35.63, so even the bigger model is expected to fail. The price can still "
+        "be worked out from the total, which a hint might prompt.",
         truth_of(inv24),
     )
 
     # 25: a printed quantity crossed out and corrected by hand. There is no
     # line-amount column, so the printed total is the only way to check it.
-    inv25 = make_invoice(rng, 25)
+    doc_rng = random.Random(seeds["25_handwritten_correction"])
+    inv25 = make_invoice(doc_rng, 25)
     correction = {"line_index": 0, "crossed_out_quantity": 4, "handwritten_quantity": 6}
     inv25["line_items"][0]["quantity"] = correction["handwritten_quantity"]
     inv25["total"] = items_total(inv25["line_items"])
@@ -260,27 +293,26 @@ def _add_scanned_documents(rng, invoices_dir: Path, add) -> None:
         show_amounts=False,
         printed_quantities={0: correction["crossed_out_quantity"]},
     )
-    page.cross_out_and_rewrite(quantity_boxes[0], str(correction["handwritten_quantity"]), rng)
-    scan = make_scanned(page, rng, scan_dpi=150, tilt_degrees=0.5, blur_radius=0.4, noise=0.08)
-    save_image_pdf(
-        invoices_dir / "25_handwritten_correction.pdf", "25_handwritten_correction", scan
-    )
+    handwritten = str(correction["handwritten_quantity"])
+    page.cross_out_and_rewrite(quantity_boxes[0], handwritten, doc_rng)
+    scan_and_save("25_handwritten_correction", page, doc_rng)
     add(
         "25_handwritten_correction",
         "hard",
         "scan",
-        "RETRY_WITH_HINT",
+        "VALID",
         "Image-only scan. The first quantity is printed as 4, crossed out, and rewritten "
-        "by hand as 6. The printed total uses 6, so reading 4 breaks the sum and the "
-        "hint points at the mismatch.",
+        "by hand as 6, and the printed total uses 6. A control document: in a dry-run "
+        "Haiku used the 6, checked it against the total, and noted the correction.",
         truth_of(inv25),
         {"correction": correction},
     )
 
-    # 26: a fax-quality scan with a stain over one price. Even the bigger model
-    # should have to guess, ideally differently each time.
+    # 26: a black-and-white fax with a stain over one price. The rest is just
+    # readable, so the missing price can be guessed or worked out from the total.
+    doc_rng = random.Random(seeds["26_fax_scan"])
     inv26 = _with_items(
-        make_invoice(rng, 26, currency="EUR"),
+        make_invoice(doc_rng, 26, currency="EUR"),
         [
             ("On-site support (hours)", 7, 81.38),
             ("Mulch delivery (cubic yard)", 3, 56.17),
@@ -289,20 +321,19 @@ def _add_scanned_documents(rng, invoices_dir: Path, add) -> None:
         ],
     )
     page = ScanPage()
-    draw_scanned_invoice(page, inv26, item_size=7, total_size=16, show_amounts=False)
-    page.stain(562 - 25, 590 - 2 * 7 * 2.2 + 2, 60, 22)
-    scan = make_scanned(
-        page, rng, scan_dpi=72, tilt_degrees=2.0, blur_radius=0.7, noise=0.2, threshold=185
-    )
-    save_image_pdf(invoices_dir / "26_illegible_scan.pdf", "26_illegible_scan", scan)
+    item_size = 8
+    draw_scanned_invoice(page, inv26, item_size=item_size, total_size=16, show_amounts=False)
+    second_row_y = 590 - 2 * item_size * 2.2
+    page.stain(562 - 25, second_row_y + 3, 60, 22)
+    scan_and_save("26_fax_scan", page, doc_rng)
     add(
-        "26_illegible_scan",
+        "26_fax_scan",
         "hard",
         "scan",
-        "MAX_ATTEMPTS",
-        "Image-only fax-quality scan (black and white, 72 dpi, tilted) with a stain over "
-        "the second unit price. Hoped for: every attempt, including the bigger model, "
-        "guesses differently. If the bigger model repeats its answer, triage says "
-        "STABLE_ANSWER instead.",
+        "RETRY_ESCALATE",
+        "Image-only black-and-white fax scan, tilted, with a stain over the second unit "
+        "price. The other values are hard but readable, and the stained price can be "
+        "worked out from the total. Expected to fail on Haiku, with and without a hint, "
+        "and to be rescued by the bigger model.",
         truth_of(inv26),
     )
