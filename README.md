@@ -165,7 +165,7 @@ Neither forces the other: JSON outputs never produce a tool call, and `strict` d
 
 ### One request
 
-```
+```text
 system  (cache_control, 1h)       identical for every document, so it can be cached
 thinking  adaptive, summarized   the model decides whether to think; we can read a summary
 output_config.format              the invoice JSON schema (same for every document)
@@ -227,7 +227,7 @@ Some designed paths, from `ground_truth.json` (these are design goals, not resul
 
 `retry-batch` reads the newest `triage.json` and submits only the documents in a `RETRY_*` class, as a new batch in a new run folder. The new `batch.json` records `round` and `parent_run`, so `triage` in that folder can follow the link back and see the earlier attempts.
 
-```
+```text
 runs/20261116-040415/   round 1   23 docs   triage: 20_total_mismatch RETRY_WITH_HINT
         ▲ parent_run
 runs/<new stamp>/       round 2    1 doc    triage (with round-1 history): same values -> STABLE_ANSWER
@@ -245,7 +245,7 @@ A run that already has a retry round can't be retried again, so the same round i
 
 The code is a package in `src/invoice_batch/`. Library modules hold the logic and are covered by tests; `cli/` holds thin commands that call them and print results.
 
-```
+```text
 src/invoice_batch/
 ├── config.py            paths, MODEL / ESCALATION_MODEL, API key check, client
 ├── schema.py            InvoiceExtraction (single source), INVOICE_SCHEMA, OUTPUT_FORMAT, parse_extraction()
