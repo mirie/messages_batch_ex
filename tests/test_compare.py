@@ -41,6 +41,11 @@ def test_a_misread_total_and_line_item_show_up():
     assert any(d.startswith("line_items[0].unit_price:") for d in diffs)
 
 
+def test_a_null_unit_price_shows_up_as_a_diff():
+    unreadable = ex(line_items=[{"description": "Widget", "quantity": 2, "unit_price": None}])
+    assert truth_diffs(unreadable, TRUTH) == ["line_items[0].unit_price: got None, truth 5.0"]
+
+
 def test_a_different_number_of_line_items_is_one_diff():
     diffs = truth_diffs(ex(line_items=[]), TRUTH)
     assert diffs == ["line_items: got 0 items, truth 1"]

@@ -62,9 +62,17 @@ def check_extraction(ex: dict) -> list[str]:
             problems.append(f"{field} {value!r} is not a YYYY-MM-DD date")
 
     items = ex.get("line_items") or []
+    unreadable = [
+        f"line item {number} ({item['description']}) has no {field}"
+        for number, item in enumerate(items, start=1)
+        for field in ("quantity", "unit_price")
+        if item.get(field) is None
+    ]
+    problems.extend(unreadable)
     if not items:
         problems.append("no line items were extracted")
-    elif ex.get("total") is not None:
+    elif not unreadable and ex.get("total") is not None:
+        # The sum can only be checked once every quantity and unit price is known.
         items_sum = round(sum(i["quantity"] * i["unit_price"] for i in items), 2)
         if abs(items_sum - ex["total"]) > SUM_TOLERANCE:
             problems.append(f"line items sum to {items_sum:.2f} but the total is {ex['total']:.2f}")

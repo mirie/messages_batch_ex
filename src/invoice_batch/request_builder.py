@@ -33,7 +33,9 @@ What to put in each field:
 - Amounts: plain numbers with a dot as decimal separator and no thousands
   separators or currency symbols (for example 1234.5, not "1,234.50").
 - line_items: one entry per billed line, in document order. quantity and
-  unit_price as printed. Do not include subtotal, tax or total rows.
+  unit_price as printed. If one of them cannot be read, use null and say so
+  in issues; never use 0 as a placeholder. Do not include subtotal, tax or
+  total rows.
 - total: the final amount due exactly as printed on the document, even if it
   disagrees with the line items. Do not correct the document.
 - issues: short factual notes about anything you could not read clearly,

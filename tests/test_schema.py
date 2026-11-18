@@ -108,3 +108,38 @@ def test_blocks_can_also_be_plain_dicts_as_saved_from_batch_results():
         {"type": "text", "text": json.dumps(valid_input())},
     ]
     assert parse_extraction(content).invoice_no == "INV-1001"
+
+
+# --- line items: an unreadable number can be null -----------------------------
+
+
+def line_item_schema():
+    """Return the generated schema for one line item, following the $ref if there is one."""
+    items = SCHEMA["properties"]["line_items"]["items"]
+    if "$ref" in items:
+        name = items["$ref"].rsplit("/", 1)[-1]
+        return SCHEMA["$defs"][name]
+    return items
+
+
+@pytest.mark.parametrize("field", ["quantity", "unit_price"])
+def test_line_item_numbers_accept_null(field):
+    property_schema = line_item_schema()["properties"][field]
+    assert {"type": "null"} in property_schema["anyOf"]
+    assert property_schema.get("description")
+
+
+def test_line_item_description_stays_a_plain_string():
+    assert line_item_schema()["properties"]["description"]["type"] == "string"
+
+
+def test_at_most_16_nullable_or_union_parameters():
+    """Check the API limit: at most 16 parameters may use anyOf or a list of types."""
+    unions = [n for n in all_nodes(SCHEMA) if "anyOf" in n or isinstance(n.get("type"), list)]
+    assert len(unions) <= 16
+
+
+def test_a_reply_with_an_unreadable_unit_price_parses():
+    item = {"description": "Mulch delivery", "quantity": 3, "unit_price": None}
+    content = [block("text", text=json.dumps(valid_input(line_items=[item])))]
+    assert parse_extraction(content).line_items[0].unit_price is None

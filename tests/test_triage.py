@@ -68,6 +68,28 @@ def test_an_invoice_with_no_line_items_is_a_problem():
     assert check_extraction(GOOD_EXTRACTION | {"line_items": []})
 
 
+def test_a_null_unit_price_is_named_in_the_problem():
+    items = [
+        {"description": "Widget", "quantity": 1, "unit_price": 4.0},
+        {"description": "Mulch delivery", "quantity": 3, "unit_price": None},
+    ]
+    problems = check_extraction(GOOD_EXTRACTION | {"line_items": items})
+    assert problems == ["line item 2 (Mulch delivery) has no unit_price"]
+
+
+def test_a_null_quantity_is_named_in_the_problem():
+    items = [{"description": "Widget", "quantity": None, "unit_price": 5.0}]
+    problems = check_extraction(GOOD_EXTRACTION | {"line_items": items})
+    assert problems == ["line item 1 (Widget) has no quantity"]
+
+
+def test_a_null_line_item_number_triages_as_retry_with_hint():
+    items = [{"description": "Widget", "quantity": 2, "unit_price": None}]
+    decision = triage_one(ok_record(line_items=items))
+    assert decision["class"] == RETRY_WITH_HINT
+    assert decision["problems"] == ["line item 1 (Widget) has no unit_price"]
+
+
 def test_issues_alone_are_not_a_problem():
     # Claude often notes harmless oddities (currency vs. address); that is not a failure.
     assert check_extraction(GOOD_EXTRACTION | {"issues": ["currency vs address"]}) == []

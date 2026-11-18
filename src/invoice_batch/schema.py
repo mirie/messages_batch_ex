@@ -22,8 +22,10 @@ class LineItem(BaseModel):
     model_config = _STRICT
 
     description: str
-    quantity: float
-    unit_price: float = Field(description="Price per unit as a plain number.")
+    quantity: float | None = Field(description="Quantity as printed, or null if it cannot be read.")
+    unit_price: float | None = Field(
+        description="Price per unit as a plain number, or null if it cannot be read."
+    )
 
 
 class InvoiceExtraction(BaseModel):
