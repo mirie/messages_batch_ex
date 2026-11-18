@@ -66,6 +66,49 @@ The tests never call the API. They cover the invoice JSON schema (generated from
 
 ## How it works
 
+### The stages
+
+```mermaid
+flowchart TB
+    subgraph prepare["Prepare the test set"]
+        G["1 · generate-invoices<br/>26 PDFs + ground_truth.json"]
+        S["2 · show-schema<br/>print the invoice JSON schema"]
+        D["3 · dry-run<br/>a few documents, one request at a time"]
+    end
+    subgraph round["One round = one run folder in runs/"]
+        SUB["4 · submit-batch<br/>one batch, one request per document"]
+        CHK["5 · check-batch<br/>poll until the batch has ended"]
+        COL["6 · collect-results<br/>download and match by custom_id"]
+        TRI["7 · triage<br/>our checks give every document a class"]
+    end
+    RET["8 · retry-batch<br/>only the RETRY_* documents, with hints"]
+    DONE(["VALID: saved"])
+    REVIEW(["NO_RETRY, STABLE_ANSWER, MAX_ATTEMPTS:<br/>human review"])
+
+    G --> D
+    G --> SUB
+    SUB -- batch.json --> CHK
+    CHK --> COL
+    COL -- results.jsonl --> TRI
+    TRI -- triage.json --> RET
+    RET -- "new run folder, linked by parent_run" --> CHK
+    TRI --> DONE
+    TRI --> REVIEW
+```
+
+| # | Stage | What happens | Writes |
+| --- | --- | --- | --- |
+| 1 | `generate-invoices` | Builds the 26 test PDFs from a fixed random seed, and records the true values and the expected outcome of each one. | `data/invoices/*.pdf`, `data/ground_truth.json` |
+| 2 | `show-schema` | Prints the JSON schema that every request sends, so you can see exactly what Claude is asked to return. | nothing |
+| 3 | `dry-run` | Sends a few documents through the normal Messages API, one at a time, and prints each reply immediately. Use it to try a document before batching it. | nothing |
+| 4 | `submit-batch` | Builds one request per PDF and sends them all as **one** batch. Without `--yes` it only prints the plan and the cost estimate. | `runs/<time>/batch.json` |
+| 5 | `check-batch` | Asks the API how the batch is doing. `--watch` keeps asking until it has ended (usually minutes, at most 24 hours). | updates `batch.json` |
+| 6 | `collect-results` | Downloads the results, which arrive in any order, and matches each one to its document by `custom_id`. Prints tokens, cost and the real wait time. | `results.jsonl` |
+| 7 | `triage` | Runs our own checks on each reply (required fields, real dates, line items present, sum equals total) and gives every document exactly one class. Then prints a table comparing the result with ground truth and with your predictions. | `triage.json` |
+| 8 | `retry-batch` | Sends only the documents in a `RETRY_*` class as a new batch, each with a hint built from its failed checks. Then stages 5–7 run again on the new run folder. | a new `runs/<time>/` |
+
+The checks in stage 7 are Python code in `triage.py`. They never trust the model to check itself, and they never look at ground truth.
+
 ### The test documents
 
 `generate-invoices` uses a fixed random seed and reportlab's invariant mode, so it produces byte-identical files every time. `data/` is git-ignored; re-run the command to recreate it.
@@ -131,6 +174,54 @@ messages[0] user:
               (+ a hint on retries)
 ```
 
+### How a document gets its class, round by round
+
+A document gets at most 3 attempts: the first batch and up to two retries. Each attempt is one round, and after each round `triage` gives the document a class. The class decides whether it is finished or goes into the next round, and how.
+
+```mermaid
+flowchart LR
+    R1["Round 1<br/>attempt 1<br/>MODEL, no hint"] --> T1{triage}
+    T1 -- passes the checks --> V1(["VALID"])
+    T1 -- "bad request, not an invoice,<br/>or empty" --> N1(["NO_RETRY"])
+    T1 -- fails a check --> H["RETRY_WITH_HINT"]
+    T1 -- "server error or expired" --> S1["RETRY_SAME"]
+
+    H --> R2["Round 2<br/>attempt 2<br/>MODEL + hint"]
+    S1 -- "same request again" --> R2
+    R2 --> T2{triage}
+    T2 -- passes the checks --> V2(["VALID"])
+    T2 -- "fails with the same<br/>values as round 1" --> SA2(["STABLE_ANSWER"])
+    T2 -- "fails with<br/>different values" --> E["RETRY_ESCALATE"]
+
+    E --> R3["Round 3<br/>attempt 3<br/>ESCALATION_MODEL + hint"]
+    R3 --> T3{triage}
+    T3 -- passes the checks --> V3(["VALID"])
+    T3 -- "fails with the same<br/>values as round 2" --> SA3(["STABLE_ANSWER"])
+    T3 -- "fails, or errors again" --> M(["MAX_ATTEMPTS"])
+
+    classDef done fill:#d8f3dc,stroke:#2d6a4f,color:#1b4332
+    classDef retry fill:#fff3bf,stroke:#b08900,color:#5c4400
+    classDef review fill:#ffe3e3,stroke:#c92a2a,color:#7d1a1a
+    class V1,V2,V3 done
+    class H,S1,E retry
+    class N1,SA2,SA3,M review
+```
+
+Green means finished, yellow means another round, and red means sent to a person for review.
+
+- **What changes between rounds:** round 2 adds a hint that names the failed checks, for example "line items sum to 543.66 but the total is 568.26". Round 3 keeps the hint and switches to the bigger model.
+- **Why "same values" stops early:** if a retry returns exactly what the previous attempt returned, another try is unlikely to help. `20_total_mismatch` ends this way, because the invoice itself is wrong.
+- **Rarer paths left out of the diagram:** a `RETRY_SAME` in round 2 sends the same request again in round 3. A document can also become `NO_RETRY` in any round. An error in round 3 ends as `MAX_ATTEMPTS`.
+
+Some designed paths, from `ground_truth.json` (these are design goals, not results):
+
+```text
+25_handwritten_correction   round 1 VALID
+20_total_mismatch           round 1 RETRY_WITH_HINT -> round 2 STABLE_ANSWER
+26_fax_scan                 round 1 RETRY_WITH_HINT -> round 2 RETRY_ESCALATE -> round 3 VALID
+24_degraded_scan            round 1 RETRY_WITH_HINT -> round 2 RETRY_ESCALATE -> round 3 MAX_ATTEMPTS
+```
+
 ### Retry rounds
 
 `retry-batch` reads the newest `triage.json` and submits only the documents in a `RETRY_*` class, as a new batch in a new run folder. The new `batch.json` records `round` and `parent_run`, so `triage` in that folder can follow the link back and see the earlier attempts.
@@ -193,6 +284,7 @@ tests/                   pytest, one file per library module
 
 | File | Purpose |
 | --- | --- |
+| `architecture.md` | How the code is organized: layers, modules, files and design rules |
 | `src/invoice_batch/` | The package (see above) |
 | `tests/` | pytest suite; runs offline |
 | `pyproject.toml` | Dependencies, the stage commands, pytest settings |
