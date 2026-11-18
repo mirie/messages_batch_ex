@@ -141,12 +141,13 @@ draw page sharply  -->  make it look scanned               -->  PDF with one ima
 ### Program flow
 
 ```mermaid
+%%{init: {"sequence": {"mirrorActors": false}}}%%
 sequenceDiagram
     participant Code as Data extraction code
     participant API as Messages API
     Code->>API: PDF + output_config.format (invoice JSON schema)
     API-->>Code: stop_reason "end_turn", content = [text '{"vendor": ...}']
-    Note over Code: json-parse the text block with parse_extraction() and you're done.
+    Note over Code,API: json-parse the text block with parse_extraction() and you're done.
 ```
 
 `INVOICE_SCHEMA` (`schema.py`, generated from the `InvoiceExtraction` Pydantic model) describes the reply: nullable fields, `is_invoice`, and an `issues` list. Sending it as `output_config.format` makes the API guarantee that Claude's reply is JSON matching the schema (keys, types, no extras). Nullable fields (`str | None`, sent as `anyOf: [string, null]`) let Claude report "not printed" instead of inventing a value. Every model gets the same request, so the Haiku attempts and the Sonnet escalation look identical.
