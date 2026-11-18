@@ -20,12 +20,13 @@ CUSTOM_ID_RE = re.compile(r"[a-zA-Z0-9_-]{1,64}")
 MAX_REQUESTS = 100_000
 MAX_BATCH_BYTES = 256 * 1024 * 1024
 
-# Measured in the dry run on Haiku 5.5 (per document), and confirmed by
-# the first real batch (runs/20261116-011243): input ~1,800, output 300-500,
-# prefix 1,608.
-DRY_RUN_INPUT_TOKENS = 2000  # uncached part: the PDF + the user text
-DRY_RUN_OUTPUT_TOKENS = 500  # the JSON reply, thinking tokens included
-DRY_RUN_PREFIX_TOKENS = 1612  # everything up to the system prompt breakpoint (cached)
+# These per-document numbers were measured on Haiku 5.5 in the 26-document
+# batch runs/20261118-014659, after line-item numbers became nullable.
+# Input averaged 2,149 tokens, and output averaged 554 tokens (99 to 1,155).
+# The cached prefix was 2,115 tokens on every request.
+DRY_RUN_INPUT_TOKENS = 2200  # uncached part: the PDF + the user text
+DRY_RUN_OUTPUT_TOKENS = 600  # the JSON reply, thinking tokens included
+DRY_RUN_PREFIX_TOKENS = 2115  # everything up to the system prompt breakpoint (cached)
 
 
 def build_requests(

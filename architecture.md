@@ -158,5 +158,4 @@ These rules hold throughout the code. The reasons are recorded in the Decisions 
 
 - **Stage 9 needs a small refactor first.** The steps "retrieve, collect, write `results.jsonl`" still live in `cli/collect_results.py`, and "read the run folder, triage, write `triage.json`" still lives in `cli/triage.py`. Both need to move into library functions so that `run-pipeline` can call them in a loop.
 - **Not built yet:** stage 9 (`run-pipeline`, the full loop with a `state.json`) and stage 10 (the client-tool experiment).
-- **The cost estimate is a little low.** `DRY_RUN_PREFIX_TOKENS` in `batch.py` is 1612, but real batches cached 1,979 tokens, and the prefix has changed again since the line-item fields became nullable.
 - **Line-item descriptions ignore the vendor.** The generator picks them at random, so a coffee roaster can bill for hedge trimming. Fixing this would change documents 01–23.
